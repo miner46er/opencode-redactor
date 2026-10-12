@@ -1,5 +1,5 @@
 // Adding a provider is a new array entry, never a new branch.
-import type { Detector, Finding, TextClass } from "./shape"
+import type { Detector, Finding, TextClass, Tier } from "./shape"
 
 /**
  * Placeholders are built from this prefix. It is reserved: `#` and `:` are in
@@ -233,10 +233,38 @@ function isDenied(value: string): boolean {
  * it deliberately leaves `fingerprint` unset rather than stamping a provisional
  * one that a caller might persist. Only redact() output is safe to log.
  */
+
+/**
+ * The Tier B gate, in one place so it cannot drift: detect() skips a Tier B
+ * rule on code, and redact() files that same case under `warned` rather than
+ * `redacted`.
+ *
+ * Tier A is an anchored provider format and redacts everywhere. Tier B is
+ * keyword-plus-entropy evidence: a credential in prose, but in source it is
+ * usually a hash or an asset, so it is reported and left alone.
+ */
+export function appliesHere(tier: Tier, surface: TextClass): boolean {
+  return tier === "A" || surface === "prose"
+}
+
+/**
+ * Document order, then longest span first, then kind for a stable tie-break.
+ * redact() re-sorts by overlap precedence, so this ordering only has to be
+ * deterministic, not meaningful.
+ */
+export function byPosition(a: Finding, b: Finding): number {
+  return a.start - b.start || b.end - a.end || compareKind(a, b)
+}
+
+/** Alphabetical, so two findings at the same span never sort unstably. */
+export function compareKind(a: Finding, b: Finding): number {
+  return a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0
+}
+
 export function detect(text: string, surface: TextClass): Finding[] {
   const findings: Finding[] = []
   for (const detector of DETECTORS) {
-    if (detector.tier === "B" && surface === "code") continue
+    if (!appliesHere(detector.tier, surface)) continue
     for (const match of text.matchAll(detector.pattern)) {
       const span = secretSpan(match)
       if (!span) continue
@@ -254,8 +282,6 @@ export function detect(text: string, surface: TextClass): Finding[] {
       })
     }
   }
-  findings.sort(
-    (a, b) => a.start - b.start || b.end - a.end || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0),
-  )
+  findings.sort(byPosition)
   return findings
 }

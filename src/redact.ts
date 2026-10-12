@@ -1,4 +1,4 @@
-import { detect } from "./rules"
+import { appliesHere, byPosition, compareKind, detect } from "./rules"
 import type { PlaceholderScope } from "./session"
 import type { Finding, RedactedFinding, RedactionResult, TextClass } from "./shape"
 
@@ -16,14 +16,14 @@ export function resolveOverlaps(findings: readonly Finding[]): Finding[] {
       const lengthDiff = b.end - b.start - (a.end - a.start)
       if (lengthDiff !== 0) return lengthDiff
       if (a.start !== b.start) return a.start - b.start
-      return a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0
+      return compareKind(a, b)
     })
   const accepted: Finding[] = []
   for (const candidate of ranked) {
     const collides = accepted.some((kept) => kept.start < candidate.end && candidate.start < kept.end)
     if (!collides) accepted.push(candidate)
   }
-  accepted.sort((a, b) => a.start - b.start || b.end - a.end)
+  accepted.sort(byPosition)
   return accepted
 }
 
@@ -32,9 +32,9 @@ export function redact(
   surface: TextClass,
   session: PlaceholderScope,
 ): RedactionResult {
-  // detect() withholds Tier B on code by contract, but the result shape still
-  // has to report those candidates as warnings, so scan the ungated set and
-  // route by tier here.
+  // detect() withholds Tier B on code, but the result shape still has to report
+  // those candidates as warnings, so scan as prose and route each finding by the
+  // same gate detect() used.
   const findings = resolveOverlaps(detect(text, "prose"))
   const redacted: RedactedFinding[] = []
   const warned: RedactedFinding[] = []
@@ -44,9 +44,7 @@ export function redact(
     if (finding.start < 0 || finding.end > text.length) continue
     const placeholder = session.placeholderFor(finding.value, finding.kind)
     const applied: RedactedFinding = { ...placeholder.finding, start: finding.start, end: finding.end }
-    if (finding.tier === "B" && surface === "code") {
-      // A keyword+entropy hit in source is a judgement call, not a confirmed
-      // credential: ledger it and warn, but do not rewrite code the model needs.
+    if (!appliesHere(finding.tier, surface)) {
       warned.push(applied)
       continue
     }
