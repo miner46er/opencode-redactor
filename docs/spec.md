@@ -20,7 +20,10 @@ not an aspiration. Numbered for citation during review.
 
 ## Surfaces
 
-5. Human-authored text is rewritten. Model-produced text is observed only.
+5. Only text given to the model is rewritten. The model's own replies are not
+   scanned: they can only contain what the model already received, which was
+   redacted on the way in, or what it invented. Tool input, which the model
+   writes, is covered by 8.
 6. User input is redacted before persistence.
 7. Tool output is redacted before persistence.
 8. Tool input is scanned and logged but NEVER rewritten. A secret there came
@@ -63,8 +66,9 @@ not an aspiration. Numbered for citation during review.
 
 20. Fail open but loud. A scanner error lets the turn proceed unscanned and
     writes to stderr. Only a positive detection blocks.
-21. Findings are always visible to the user. Never persist values. Audit records
-    carry kind, surface, offset, fingerprint, and action only.
+21. Never persist values. Audit records carry kind, surface, offset,
+    fingerprint, and action only. Surfacing findings in the OpenCode UI is
+    deliberately deferred; the audit log is the only record for now.
 
 ## Accuracy bar
 

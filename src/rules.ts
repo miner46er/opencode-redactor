@@ -203,7 +203,18 @@ export const DETECTORS: readonly Detector[] = [
   {
     kind: "pem-private-key",
     tier: "A",
-    pattern: /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----/gd,
+    // A complete block runs to its END marker. Output cut off before the END
+    // marker (head, a tool's truncation) would otherwise match nothing and send
+    // the key body through, so a block with no END runs over the key material
+    // that follows: base64 lines, "Proc-Type:"-style headers, and blank lines
+    // between them. It stops at the first other line, so a truncation note
+    // after the key survives, and it needs a body, so a header named in prose
+    // does not match. A line break may be real or the two characters "\n", as
+    // inside a JSON string. The END search is capped so many headers with no
+    // END cannot make a scan quadratic; a block longer than the cap still has
+    // every body line covered by the truncated branch.
+    pattern:
+      /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----(?:[\s\S]{0,16384}?-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|(?=(?:(?:\r?\n|(?:\\r)?\\n)+[A-Za-z][A-Za-z-]*: [^\r\n\\]*)*(?:\r?\n|(?:\\r)?\\n)+[A-Za-z0-9+/]{16})(?:(?:\r?\n|(?:\\r)?\\n)+(?:[A-Za-z][A-Za-z-]*: [^\r\n\\]*|[A-Za-z0-9+/=]+))+)/gd,
   },
   {
     kind: "jwt",

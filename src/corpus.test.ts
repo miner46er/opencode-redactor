@@ -53,8 +53,8 @@ function expectNoFindings(fixture: BenignFixture, surface: TestSurface): void {
 
 describe("corpus integrity", () => {
   it("keeps the exact fixture counts", () => {
-    expect(SECRETS, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(70)
-    expect(BENIGN, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(33)
+    expect(SECRETS, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(73)
+    expect(BENIGN, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(34)
   })
 
   it("embeds every secret value verbatim in its context", () => {

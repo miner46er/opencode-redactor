@@ -29,6 +29,31 @@ x+RmSiSP484H4Ie1dmRCSqUmaUntchpN6rHKMd+uacp91aQ23IfMhwOroTbyugOq
 YMiFQz2RGEaNhsO6YoE67LMdTHAdch0w81BkUuS0p/qB7RTv0BYm2YT0bt4ZCrcO
 -----END RSA PRIVATE KEY-----`
 
+// Truncated private keys: output cut off before the END marker. Bodies are
+// random base64, not key material.
+const PEM_TRUNCATED_OPENSSH = [
+  "-----BEGIN OPENSSH PRIVATE KEY-----",
+  "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW",
+  "Q4XkR2vLm9TqW3zPb7NcY1hJ5fD8sGx0aEuKiOp4rBtZ6wMn2lVjU+yHdA/gCeF3oQ7iSN",
+  "xP5mRk1Tz9WqLv3Hc8Yb2Nf6Ju4Dg0Ks7Ea1Ri5Mo9Ux3Vp2Gt6Bw8Ql4Zn0Hy7Cj1Ie5",
+].join("\n")
+
+const PEM_TRUNCATED_ENCRYPTED = [
+  "-----BEGIN RSA PRIVATE KEY-----",
+  "Proc-Type: 4,ENCRYPTED",
+  "DEK-Info: AES-128-CBC,3F2A9C1E7B04D2A6F8E1C3B5A7D9E0F2",
+  "",
+  "kV7tR2mQ9xL4wZ8pB3nJ6hY1cF5dS0gK7aE2uI9oP4rT6yW3qM8vN1bX5zC0jH7lG2sD",
+  "Tq4Wm8Rz2Xk6Vn0Pb5Lc9Hd3Jf7Gs1Ya5Ue9Io3Kt7Ow1Mp5Qr9Sx3Zv7Cn1Bh5Dj9Fl",
+].join("\n")
+
+/** As stored inside a JSON string: the newlines are the two characters "\\n". */
+const PEM_TRUNCATED_JSON_ESCAPED = [
+  "-----BEGIN PRIVATE KEY-----",
+  "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDm4Xk9TqW3zPb7NcY1",
+  "hJ5fD8sGx0aEuKiOp4rBtZ6wMn2lVjU",
+].join("\\n")
+
 const CERT_BODY = `Ib/NHRAr9XxkEhA/SfudB/B2pbASsRYerEATXmmWoeLhWfsbGByNN0glddIkHcNk
 hhutOd9KXqXobCh/VpA2DW6FCwbbSbPF+/DR94ujMO5YrbQxBCPG6NmXW7ek1nZJ
 kAzxgfcZryzTwCFHquUNgOmyDslhTQUR5GEeWv/coT2riufaYtT2kS3mngQHsQsf
@@ -208,6 +233,33 @@ always-auth=true`,
 ${PEM_BLOCK}
 
 The runner reloads it on the next tick and never writes it to disk.`,
+  },
+  {
+    label: "pem-truncated-by-head",
+    kind: "pem-private-key",
+    tier: "A",
+    value: PEM_TRUNCATED_OPENSSH,
+    context: `$ head -4 ~/.ssh/deploy_ed25519
+${PEM_TRUNCATED_OPENSSH}`,
+  },
+  {
+    label: "pem-truncated-before-tool-note",
+    kind: "pem-private-key",
+    tier: "A",
+    value: PEM_TRUNCATED_ENCRYPTED,
+    context: `${PEM_TRUNCATED_ENCRYPTED}
+
+... output truncated (24 more lines). Full output saved to /tmp/out-3f2a.txt`,
+  },
+  {
+    label: "pem-truncated-json-escaped",
+    kind: "pem-private-key",
+    tier: "A",
+    value: PEM_TRUNCATED_JSON_ESCAPED,
+    context: `{
+  "type": "service_account",
+  "private_key_id": "placeholder",
+  "private_key": "${PEM_TRUNCATED_JSON_ESCAPED}`,
   },
   {
     label: "jwt-bearer-log-line",
@@ -974,5 +1026,12 @@ PWD=/home/dev/projects/payments-service`,
     reason:
       "Slack and Discord webhook host paths quoted in documentation with no token segment. The host path is public; only the trailing secret in a complete webhook URL authenticates a post.",
     text: "The integration guide points at https://hooks.slack.com/services/ and https://discord.com/api/webhooks/ as the endpoints to configure; paste the generated URL from each service's settings page.",
+  },
+  {
+    label: "pem-header-named-in-prose",
+    reason:
+      "A PEM header quoted in an explanation, with no key body after it. Only key material is a credential; the marker alone tells the reader what to look for.",
+    text: `Never commit a file that starts with -----BEGIN RSA PRIVATE KEY-----
+Add it to .gitignore and rotate the key if it was ever pushed.`,
   },
 ]
