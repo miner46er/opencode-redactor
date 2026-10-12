@@ -6,12 +6,17 @@
  * is what tells the two apart.
  */
 
-/** Where text is crossing the model boundary. */
-export type Surface =
-  | "prompt" // user-authored chat input, via session.hook("prompt")
-  | "tool" // tool output, via tool.hook("execute.after")
-  | "code" // tool output judged to be source rather than prose
-  | "prose" // tool output judged to be human-readable text
+/**
+ * Where text crosses the model boundary. A channel is a place data flows
+ * through, independent of what the text turns out to be.
+ */
+export type Channel = "prompt" | "tool-output" | "tool-input"
+
+/**
+ * What the text is. Drives the Tier B gate: an entropy hit in prose is a
+ * credential, and the same hit in source is usually a hash or an asset.
+ */
+export type TextClass = "prose" | "code"
 
 /**
  * Tier A is an anchored provider format: AKIA..., ghp_..., PEM blocks.

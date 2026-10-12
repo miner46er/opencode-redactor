@@ -189,16 +189,20 @@ describe("deny-list", () => {
 })
 
 describe("no partial coverage", () => {
-  // A rule that matches a fixed width without a right-hand boundary leaves the
-  // tail of a longer secret in the output. That is worse than a miss: it looks
-  // like the redactor worked while a credential fragment survives. Each case
-  // asserts the whole value is either covered or the candidate is rejected.
-  const OVERLONG: readonly [string, string, string][] = [
+  // A rule that matches a prefix of a longer credential leaves the tail in the
+  // output. That is worse than a miss: it looks like the redactor worked while
+  // a fragment survives. \b is not an acceptable terminator for a pattern that
+  // can sit inside a hyphenated or alphanumeric run, because \b breaks at "-".
+  const OVERLONG: ReadonlyArray<readonly [string, string, string]> = [
     ["aws-secret-access-key", "AWS_SECRET_ACCESS_KEY", "aB3xK9mQ7pL2wR8tY5uI1oP4sD6fG0hJ2kL5nB7vC9xZ1"],
     ["github-pat", "GITHUB_TOKEN", `ghp_${"a".repeat(40)}`],
     ["npm-token", "NPM_TOKEN", `npm_${"b".repeat(40)}`],
     ["google-api-key", "GOOGLE_KEY", `AIza${"c".repeat(39)}`],
     ["aws-access-key-id", "AWS_KEY", `AKIA${"D".repeat(20)}`],
+    // Hyphenated runs are the case \b gets wrong: it matches through the last
+    // group the pattern allows and stops there.
+    ["slack-token", "SLACK_BOT_TOKEN", `xoxb-${"1".repeat(12)}-${"2".repeat(12)}-${"3".repeat(12)}-abcdefghij-SECRETTAIL9f2a`],
+    ["stripe-live-key", "STRIPE_KEY", `sk_live_${"a".repeat(30)}-${"b".repeat(30)}-SECRETTAIL`],
   ]
 
   for (const [kind, name, value] of OVERLONG) {
@@ -213,6 +217,60 @@ describe("no partial coverage", () => {
       ).toBe(true)
     })
   }
+
+  // Property check over the whole registry, so a detector added later cannot
+  // reintroduce a prefix match without this suite noticing. Only detectors
+  // whose charset admits the tail characters can be checked this way: the AWS
+  // key id is uppercase alphanumeric by definition, so a hyphen after it is not
+  // part of the credential and correctly ends the match.
+  const HYPHENATED_TAILS: Readonly<Record<string, string>> = {
+    // Slack and Stripe admit hyphens inside the token, so a hyphenated tail is
+    // genuinely part of the credential and must be covered. GitHub and npm
+    // tokens are strictly alphanumeric, so their tails are checked separately
+    // with in-charset characters.
+    "slack-token": `xoxb-${"a".repeat(10)}-${"b".repeat(10)}-${"c".repeat(10)}-dddddddddd-TAILTAILTAIL`,
+    "stripe-live-key": `sk_live_${"a".repeat(30)}-${"b".repeat(30)}-TAILTAIL`,
+  }
+
+  test("no detector matches a strict prefix of a longer hyphenated credential", () => {
+    for (const [kind, sample] of Object.entries(HYPHENATED_TAILS)) {
+      const finding = detect(sample, "prose").find((candidate) => candidate.kind === kind)
+      if (finding === undefined) continue
+      const covered = sample.slice(finding.start, finding.end)
+      expect(
+        covered === sample,
+        `${kind} matched ${covered.length} of ${sample.length} chars, leaving "${sample.slice(covered.length)}"`,
+      ).toBe(true)
+    }
+  })
+
+  test("a credential run ending on a word character is matched whole", () => {
+    // Stripe keys admit "_", which \b treats as a boundary, so a key containing
+    // one was previously truncated at the underscore.
+    const key = `sk_live_${"a".repeat(24)}_${"b".repeat(24)}`
+    const finding = detect(key, "prose").find((candidate) => candidate.kind === "stripe-live-key")
+    expect(finding, "stripe live key with an underscore was not detected").toBeDefined()
+    expect(key.slice(finding?.start ?? 0, finding?.end ?? 0)).toBe(key)
+  })
+
+  test("an over-long alphanumeric token is matched whole or rejected", () => {
+    // GitHub and npm tokens are strictly alphanumeric, so the tail has to be
+    // built from the same charset to be a fair test of the boundary.
+    const samples: ReadonlyArray<readonly [string, string]> = [
+      ["github-pat", `ghp_${"a".repeat(36)}TAILTAILTAIL`],
+      ["npm-token", `npm_${"a".repeat(36)}TAILTAILTAIL`],
+      ["google-api-key", `AIza${"a".repeat(35)}TAILTAILTAIL`],
+    ]
+    for (const [kind, sample] of samples) {
+      const finding = detect(sample, "prose").find((candidate) => candidate.kind === kind)
+      if (finding === undefined) continue
+      const covered = sample.slice(finding.start, finding.end)
+      expect(
+        covered === sample,
+        `${kind} matched ${covered.length} of ${sample.length} chars, leaving "${sample.slice(covered.length)}"`,
+      ).toBe(true)
+    }
+  })
 
   test("a redacted over-long secret leaves nothing recognisable behind", () => {
     const session = createPlaceholderScope()

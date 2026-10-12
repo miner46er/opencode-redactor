@@ -1,6 +1,6 @@
 import { detect } from "./rules"
 import type { PlaceholderScope } from "./session"
-import type { Finding, RedactedFinding, RedactionResult } from "./shape"
+import type { Finding, RedactedFinding, RedactionResult, TextClass } from "./shape"
 
 /**
  * Findings can nest or overlap because provider formats sit inside assignments.
@@ -29,7 +29,7 @@ export function resolveOverlaps(findings: readonly Finding[]): Finding[] {
 
 export function redact(
   text: string,
-  surface: "prose" | "code",
+  surface: TextClass,
   session: PlaceholderScope,
 ): RedactionResult {
   // detect() withholds Tier B on code by contract, but the result shape still

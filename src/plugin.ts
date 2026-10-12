@@ -4,7 +4,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { redact } from "./redact"
 import { createPlaceholderRegistry } from "./session"
-import type { RedactionResult, Surface } from "./shape"
+import type { Channel, RedactedFinding, RedactionResult, TextClass } from "./shape"
 
 /**
  * Redacts credentials from OpenCode traffic before it reaches a model.
@@ -26,12 +26,13 @@ import type { RedactionResult, Surface } from "./shape"
 const AUDIT_LOG = join(homedir(), ".local", "share", "opencode", "redactor-audit.log")
 
 interface AuditRecord {
-  readonly surface: Surface
+  readonly channel: Channel
   readonly kind: string
   readonly tier: "A" | "B"
   readonly fingerprint: string
   readonly offset: number
-  readonly action: "redacted" | "warned"
+  /** What actually happened to the text. "observed" means nothing was changed. */
+  readonly action: "redacted" | "warned" | "observed"
 }
 
 /**
@@ -43,38 +44,38 @@ function audit(records: readonly AuditRecord[]): void {
   const lines = records
     .map(
       (r) =>
-        `${new Date().toISOString()} surface=${r.surface} action=${r.action} tier=${r.tier} kind=${r.kind} fp=${r.fingerprint} offset=${r.offset}`,
+        `${new Date().toISOString()} channel=${r.channel} action=${r.action} tier=${r.tier} kind=${r.kind} fp=${r.fingerprint} offset=${r.offset}`,
     )
     .join("\n")
   try {
     appendFileSync(AUDIT_LOG, `${lines}\n`, { mode: 0o600 })
-  } catch {
-    // An unwritable audit log must not block the session.
+  } catch (error) {
+    // An unwritable audit log must not block the session, but the findings it
+    // was meant to record are then invisible, so say so rather than swallow it.
+    process.stderr.write(`[redactor] could not write the audit log: ${String(error)}\n`)
   }
 }
 
-function toRecords(surface: Surface, result: RedactionResult): AuditRecord[] {
-  const redacted = result.redacted.map(
-    (f): AuditRecord => ({
-      surface,
-      kind: f.kind,
-      tier: f.tier,
-      fingerprint: f.fingerprint,
-      offset: f.start,
-      action: "redacted",
-    }),
-  )
-  const warned = result.warned.map(
-    (f): AuditRecord => ({
-      surface,
-      kind: f.kind,
-      tier: f.tier,
-      fingerprint: f.fingerprint,
-      offset: f.start,
-      action: "warned",
-    }),
-  )
-  return [...redacted, ...warned]
+function record(
+  channel: Channel,
+  action: AuditRecord["action"],
+  finding: RedactedFinding,
+): AuditRecord {
+  return {
+    channel,
+    action,
+    kind: finding.kind,
+    tier: finding.tier,
+    fingerprint: finding.fingerprint,
+    offset: finding.start,
+  }
+}
+
+function toRecords(channel: Channel, result: RedactionResult): AuditRecord[] {
+  return [
+    ...result.redacted.map((f) => record(channel, "redacted", f)),
+    ...result.warned.map((f) => record(channel, "warned", f)),
+  ]
 }
 
 /**
@@ -130,7 +131,10 @@ export default Plugin.define({
       const text = event.prompt?.text
       if (typeof text !== "string" || text.length === 0) return
       try {
-        const result = redact(text, "prose", registry.for(event.sessionID))
+        // A pasted file is code even though it arrived as chat, and the Tier B
+        // gate exists to keep source readable.
+        const classification: TextClass = isCodeish(text) ? "code" : "prose"
+        const result = redact(text, classification, registry.for(event.sessionID))
         if (result.text !== text) {
           event.prompt.text = result.text
           audit(toRecords("prompt", result))
@@ -143,13 +147,13 @@ export default Plugin.define({
     await ctx.tool.hook("execute.after", (event) => {
       if (event.status !== "completed" || !event.result) return
       try {
-        const surface: Surface = isCodeish(JSON.stringify(event.result).slice(0, 4000)) ? "code" : "prose"
+        const text: TextClass = isCodeish(JSON.stringify(event.result).slice(0, 4000)) ? "code" : "prose"
         const scope = registry.for(event.sessionID)
         const records: AuditRecord[] = []
-        walkStrings(event.result, (text) => {
-          if (text.length === 0) return text
-          const result = redact(text, surface, scope)
-          if (result.text !== text) records.push(...toRecords(surface, result))
+        walkStrings(event.result, (value) => {
+          if (value.length === 0) return value
+          const result = redact(value, text, scope)
+          if (result.text !== value) records.push(...toRecords("tool-output", result))
           return result.text
         })
         audit(records)
@@ -163,9 +167,13 @@ export default Plugin.define({
       try {
         const input = JSON.stringify(event.input ?? {})
         if (input.length === 0) return
+        // Nothing is rewritten here, so every finding is recorded as observed.
+        // Reporting these as redacted would make the log claim work that never
+        // happened, which is worse than logging nothing.
         const result = redact(input, "prose", registry.for(event.sessionID))
-        if (result.warned.length > 0 || result.redacted.length > 0) {
-          audit(toRecords("tool", result))
+        const observed = [...result.redacted, ...result.warned]
+        if (observed.length > 0) {
+          audit(observed.map((f) => record("tool-input", "observed", f)))
         }
       } catch (error) {
         process.stderr.write(`[redactor] tool input scan failed: ${String(error)}\n`)

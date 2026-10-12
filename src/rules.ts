@@ -1,5 +1,5 @@
 // Adding a provider is a new array entry, never a new branch.
-import type { Detector, Finding } from "./shape"
+import type { Detector, Finding, TextClass } from "./shape"
 
 /**
  * Placeholders are built from this prefix. It is reserved: `#` and `:` are in
@@ -104,12 +104,17 @@ export const DETECTORS: readonly Detector[] = [
   {
     kind: "slack-token",
     tier: "A",
-    pattern: /\bxox[bp]-(?:[0-9A-Za-z]{6,48}-){0,4}[0-9A-Za-z]{10,64}\b/gd,
+    // \b cannot be the terminator here: it treats "-" as a boundary, so a
+    // token with more hyphen groups than the pattern allows would match on a
+    // prefix and leave the tail behind.
+    pattern: /\bxox[bp]-[A-Za-z0-9-]{10,}(?![A-Za-z0-9-])/gd,
   },
   {
     kind: "stripe-live-key",
     tier: "A",
-    pattern: /\b(?:sk|rk)_live_[A-Za-z0-9]{24,99}\b/gd,
+    // "_" is in the negated class too: it is a word character, so \b would stop
+    // at it and leave the rest of the key exposed.
+    pattern: /\b(?:sk|rk)_live_[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])/gd,
   },
   {
     kind: "google-api-key",
@@ -228,7 +233,7 @@ function isDenied(value: string): boolean {
  * it deliberately leaves `fingerprint` unset rather than stamping a provisional
  * one that a caller might persist. Only redact() output is safe to log.
  */
-export function detect(text: string, surface: "prose" | "code"): Finding[] {
+export function detect(text: string, surface: TextClass): Finding[] {
   const findings: Finding[] = []
   for (const detector of DETECTORS) {
     if (detector.tier === "B" && surface === "code") continue
