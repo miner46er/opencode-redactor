@@ -26,8 +26,12 @@ and this does not run on v1.
 **Clean** means two different things and this plugin only guarantees one of them.
 
 The **model boundary is clean.** Nothing the model can read contains a detected
-credential. That is the guarantee, and it is the one that matters, because it
+credential. That covers user input, tool output, and the system prompt, and it
 holds across the session store, the outgoing request, compaction, and subagents.
+
+One field is deliberately not scanned: MCP tool descriptions. Rewriting a tool
+description breaks the contract the model relies on to call it correctly, so a
+secret pasted into an MCP server's description would still reach the provider.
 
 The **disk is not clean.** OpenCode's `shell` tool writes full raw output to
 `~/.local/share/opencode/shell/<scope>/sh_*.out` *before* any plugin hook runs.
@@ -80,8 +84,13 @@ model composed.
 `~/.local/share/opencode/redactor-audit.log`, mode 600, one line per finding:
 
 ```
-2026-01-01T00:00:00.000Z surface=prompt action=redacted tier=A kind=github-pat fp=3f2a9c1e7b04 offset=142
+2026-01-01T00:00:00.000Z channel=prompt action=redacted tier=A kind=github-pat fp=3f2a9c1e7b04 offset=142
 ```
+
+`channel` is `prompt`, `system`, `tool-output` or `tool-input`. `action` is
+`redacted` when the text was changed, `warned` when a Tier B hit in source was
+deliberately left alone, and `observed` when the text was scanned but not
+modified.
 
 Metadata only. Values are never written. Delete it freely.
 
@@ -92,7 +101,11 @@ history. The host persists `state.content`, derived from `result.content`, and
 the stored block has no `state.output` field. This plugin walks and rewrites the
 entire result so that content is what changes.
 
-Tool *input* is scanned and logged but never rewritten.
+Tool *input* is scanned and logged as `action=observed`, never rewritten, since
+nothing on that path is changed.
+
+A pasted file arriving as chat is classified before redaction, so the Tier B
+gate applies to code in a prompt the same way it does in tool output.
 
 A failed or slow scan fails open: the turn proceeds unscanned and a line goes to
 stderr.

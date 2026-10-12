@@ -144,6 +144,31 @@ export default Plugin.define({
       }
     })
 
+    // The system prompt carries agent instructions, skills and MCP tool
+    // descriptions, so a secret written into any of them would otherwise reach
+    // the provider on every turn. Only the text parts are rewritten: `tools` is
+    // deliberately left alone, since editing a tool description breaks the
+    // contract the model relies on to call it. Messages need no pass here,
+    // because history was already redacted before it was persisted.
+    await ctx.session.hook("context", (event) => {
+      try {
+        const scope = registry.for(event.sessionID)
+        for (const part of event.system) {
+          if (typeof part.text !== "string" || part.text.length === 0) continue
+          const result = redact(part.text, "prose", scope)
+          if (result.text !== part.text) {
+            // SystemPart.text is typed readonly, but the host builds the request
+            // from this object after the hook returns. Verified against 2.0.27:
+            // a canary written here is what the model then reads back.
+            ;(part as { text: string }).text = result.text
+            audit(toRecords("system", result))
+          }
+        }
+      } catch (error) {
+        process.stderr.write(`[redactor] system prompt pass failed, sending unscanned: ${String(error)}\n`)
+      }
+    })
+
     await ctx.tool.hook("execute.after", (event) => {
       if (event.status !== "completed" || !event.result) return
       try {

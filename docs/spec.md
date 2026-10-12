@@ -26,7 +26,7 @@ not an aspiration. Numbered for citation during review.
 8. Tool input is scanned and logged but NEVER rewritten. A secret there came
    from the model hallucinating one or from the user issuing a command
    deliberately, and rewriting either silently corrupts an intentional command.
-9. System prompt is redacted. MCP tool descriptions are out of scope, because
+9. System prompt text parts are redacted. MCP tool descriptions are out of scope, because
    rewriting them breaks a contract with the model.
 
 ## Detection

@@ -10,7 +10,7 @@
  * Where text crosses the model boundary. A channel is a place data flows
  * through, independent of what the text turns out to be.
  */
-export type Channel = "prompt" | "tool-output" | "tool-input"
+export type Channel = "prompt" | "system" | "tool-output" | "tool-input"
 
 /**
  * What the text is. Drives the Tier B gate: an entropy hit in prose is a
