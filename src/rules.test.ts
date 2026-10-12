@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { DENYLIST, DETECTORS, detect, shannonEntropy } from "./rules"
 import { redact, resolveOverlaps } from "./redact"
-import { createSessionScope } from "./session"
+import { createPlaceholderRegistry, createPlaceholderScope } from "./session"
 import type { Finding } from "./shape"
 
 const AWS_ACCESS_KEY = "AKIA1234567890ABCDEF"
@@ -48,10 +48,8 @@ const TIER_A_CASES: ReadonlyArray<readonly [string, string]> = [
 ]
 
 describe("registry shape", () => {
-  // Tier and entropy are orthogonal. A detector may be Tier B because it is
-  // lower-confidence evidence (warn in code) while still being anchored, in
-  // which case it declares no floor. What must hold is that an entropy floor is
-  // never attached to a Tier A rule, since Tier A matches on shape alone.
+  // Tier and entropy are orthogonal. A Tier B detector may be anchored and so
+  // carry no floor, and an absent floor still applies the default at match time.
   test("no Tier A detector declares an entropy floor", () => {
     for (const detector of DETECTORS) {
       if (detector.tier === "A") {
@@ -217,7 +215,7 @@ describe("no partial coverage", () => {
   }
 
   test("a redacted over-long secret leaves nothing recognisable behind", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const value = "aB3xK9mQ7pL2wR8tY5uI1oP4sD6fG0hJ2kL5nB7vC9xZ1"
     const result = redact(`AWS_SECRET_ACCESS_KEY=${value}`, "prose", session)
     expect(result.text.includes("C9xZ1"), "the trailing fragment of the secret survived redaction").toBe(false)
@@ -227,7 +225,7 @@ describe("no partial coverage", () => {
 
 describe("redact", () => {
   test("returns the input unchanged when nothing is found", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const result = redact("nothing to see here", "prose", session)
     expect(result.text).toBe("nothing to see here")
     expect(result.redacted).toEqual([])
@@ -235,7 +233,7 @@ describe("redact", () => {
   })
 
   test("multiple findings apply right-to-left with valid offsets", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const text = `aws=${AWS_ACCESS_KEY} gh=ghp_${GITHUB_BODY} end`
     const result = redact(text, "prose", session)
 
@@ -256,7 +254,7 @@ describe("redact", () => {
   })
 
   test("connection strings redact only the password, keeping the URI shape", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const result = redact(CONNECTION_STRING, "prose", session)
     const fingerprint = result.redacted[0]?.fingerprint
     expect(result.redacted.map((finding) => finding.kind)).toEqual(["connection-string-password"])
@@ -266,7 +264,7 @@ describe("redact", () => {
   })
 
   test("a Tier A finding beats an overlapping Tier B finding", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const text = `password = "${AWS_ACCESS_KEY}"`
     const result = redact(text, "prose", session)
     expect(result.redacted.map((finding) => finding.kind)).toEqual(["aws-access-key-id"])
@@ -277,8 +275,7 @@ describe("redact", () => {
   })
 
   test("for equal tiers the longer span wins a nested overlap", () => {
-    const session = createSessionScope()
-    // The Google-format key is nested inside the JWT signature; both are Tier A.
+    const session = createPlaceholderScope()
     const text = `token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sig-${GOOGLE_API_KEY}`
     expect(detect(text, "prose").map((finding) => finding.kind)).toContain("google-api-key")
     const result = redact(text, "prose", session)
@@ -303,7 +300,7 @@ describe("redact", () => {
   })
 
   test("Tier B is warned, not redacted, on code", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const text = `api_key = "${GENERIC_VALUE}"`
     const result = redact(text, "code", session)
     expect(result.text).toBe(text)
@@ -313,7 +310,7 @@ describe("redact", () => {
   })
 
   test("code redacts Tier A and warns Tier B in the same pass", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const text = `AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}\napi_key = "${GENERIC_VALUE}"`
     const result = redact(text, "code", session)
     expect(result.redacted.map((finding) => finding.kind)).toEqual(["aws-access-key-id"])
@@ -323,7 +320,7 @@ describe("redact", () => {
   })
 
   test("prose redacts Tier A and Tier B together, with no warnings", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const text = `AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}\napi_key = "${GENERIC_VALUE}"`
     const result = redact(text, "prose", session)
     expect(result.warned).toEqual([])
@@ -336,7 +333,7 @@ describe("redact", () => {
   })
 
   test("the same value gets the same placeholder everywhere in one session", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const text = `a=${AWS_ACCESS_KEY} b=${AWS_ACCESS_KEY}`
     const result = redact(text, "prose", session)
     expect(result.redacted.length).toBe(2)
@@ -363,7 +360,7 @@ describe("idempotency", () => {
 
   IDEMPOTENCY_INPUTS.forEach(([surface, input], index) => {
     test(`redact(redact(x)) === redact(x) for input ${index} (${surface})`, () => {
-      const session = createSessionScope()
+      const session = createPlaceholderScope()
       const once = redact(input, surface, session)
       const twice = redact(once.text, surface, session)
       expect(twice.text).toBe(once.text)
@@ -376,7 +373,7 @@ describe("idempotency", () => {
   })
 
   test("no detector can match any emitted placeholder", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const emitted = redact(`AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}`, "prose", session).text
     const samples = DETECTORS.map((detector) => `[REDACTED:${detector.kind}#1:3f2a9c1e7b04]`)
     samples.push(emitted, "[REDACTED:generic-secret#12:abcdef012345]")
@@ -391,14 +388,14 @@ describe("idempotency", () => {
 
 describe("session scope", () => {
   test("fingerprints are exactly 12 lowercase hex chars", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const placeholder = session.placeholderFor("some-distinct-value-1234", "generic-secret")
     expect(placeholder.finding.fingerprint).toMatch(/^[0-9a-f]{12}$/)
   })
 
   test("two scopes fingerprint the same value differently", () => {
-    const first = createSessionScope()
-    const second = createSessionScope()
+    const first = createPlaceholderScope()
+    const second = createPlaceholderScope()
     const a = first.placeholderFor(AWS_SECRET, "generic-secret")
     const b = second.placeholderFor(AWS_SECRET, "generic-secret")
     expect(a.finding.fingerprint).not.toBe(b.finding.fingerprint)
@@ -407,7 +404,7 @@ describe("session scope", () => {
   })
 
   test("counters are per kind and stable per value", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const a = session.placeholderFor("value-aaaa-1234-5678", "generic-secret")
     const b = session.placeholderFor("value-bbbb-1234-5678", "generic-secret")
     const c = session.placeholderFor("value-cccc-1234-5678", "aws-access-key-id")
@@ -418,7 +415,7 @@ describe("session scope", () => {
   })
 
   test("findings exposes observed values in memory and reset clears them", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     session.placeholderFor("value-aaaa-1234-5678", "generic-secret")
     expect(session.findings().length).toBe(1)
     expect(session.findings()[0]?.value).toBe("value-aaaa-1234-5678")
@@ -427,10 +424,41 @@ describe("session scope", () => {
   })
 
   test("reset rotates the key so fingerprints do not correlate across epochs", () => {
-    const session = createSessionScope()
+    const session = createPlaceholderScope()
     const before = session.placeholderFor(AWS_SECRET, "generic-secret").finding.fingerprint
     session.reset()
     const after = session.placeholderFor(AWS_SECRET, "generic-secret").finding.fingerprint
+    expect(after).not.toBe(before)
+  })
+})
+
+describe("conversation isolation", () => {
+  // The host scopes a plugin instance to a directory, not a conversation. If one
+  // scope were shared across conversations, the same credential would carry the
+  // same fingerprint into two unrelated histories, and equality would become
+  // correlatable between them.
+  test("two conversations in one process fingerprint the same value differently", () => {
+    const registry = createPlaceholderRegistry()
+    const value = "AKIA7QWERTYUIOPASDFGH"
+    const a = registry.for("ses_alpha").placeholderFor(value, "aws-access-key-id")
+    const b = registry.for("ses_beta").placeholderFor(value, "aws-access-key-id")
+    expect(a.finding.fingerprint).not.toBe(b.finding.fingerprint)
+  })
+
+  test("the same conversation reuses its scope and its fingerprint", () => {
+    const registry = createPlaceholderRegistry()
+    const value = "AKIA7QWERTYUIOPASDFGH"
+    const first = registry.for("ses_alpha").placeholderFor(value, "aws-access-key-id")
+    const second = registry.for("ses_alpha").placeholderFor(value, "aws-access-key-id")
+    expect(second.text).toBe(first.text)
+  })
+
+  test("releasing a conversation drops its key so history cannot be rechecked", () => {
+    const registry = createPlaceholderRegistry()
+    const value = "AKIA7QWERTYUIOPASDFGH"
+    const before = registry.for("ses_alpha").placeholderFor(value, "aws-access-key-id").finding.fingerprint
+    registry.release("ses_alpha")
+    const after = registry.for("ses_alpha").placeholderFor(value, "aws-access-key-id").finding.fingerprint
     expect(after).not.toBe(before)
   })
 })

@@ -1,8 +1,3 @@
-// Expects src/rules.ts to export:
-//   export function detect(text: string, surface: "prose" | "code"): Finding[]
-// Tier A detectors match regardless of surface.
-// Tier B detectors return a finding on "prose" and return [] on "code".
-
 import { describe, expect, it } from "bun:test"
 import { BENIGN, SECRETS, type BenignFixture, type SecretFixture } from "./corpus"
 import { detect } from "./rules"

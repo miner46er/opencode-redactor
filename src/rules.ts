@@ -1,8 +1,4 @@
-/**
- * The detector registry: one table row per provider format. Surface gating,
- * entropy gating, and tier routing all read the `tier` and `entropy` fields off
- * each row, so adding a provider is a new array entry, never a new branch.
- */
+// Adding a provider is a new array entry, never a new branch.
 import type { Detector, Finding } from "./shape"
 
 /**

@@ -130,9 +130,6 @@ STRIPE_SECRET_KEY=sk_live_51F4kEExAmPlE0000000000000000
 STRIPE_WEBHOOK_TOLERANCE=300`,
   },
   {
-    // Tier B: test-mode keys are not production credentials, so exposure is a
-    // warning rather than an incident. The random body still has to clear the
-    // same entropy gate as any other unprefixed value.
     label: "stripe-test-key-env",
     kind: "stripe-test-key",
     tier: "B",
@@ -383,10 +380,6 @@ index 4d2a6c9..8ec3b1f 100644
     text: "Incident response is mostly reading. The on-call engineer opens the dashboard, checks whether the alert is new or a long-running annoyance, then decides whether to page the service owner. Most alerts resolve themselves during the next deploy window; the ones that do not leave a trail of notes that the next person on shift has to reconstruct from scratch. A good runbook shortens that reconstruction by recording what was already tried and what it changed. When the alert is real, the fastest path is usually to stop the bleeding first and understand the cause second.",
   },
   {
-    // The jwt.io sample is asserted, not merely noted: pattern-wise it is a
-    // valid JWT, so the only correct behavior is an exact-value allowlist, the
-    // same suppression gitleaks ships. Loosening the JWT pattern instead would
-    // start missing real tokens.
     label: "jwt-io-sample-token",
     reason:
       "The default sample token from the jwt.io debugger, reproduced in countless tutorials. It is structurally identical to a live JWT, so it cannot be excluded by pattern; it requires an exact-value allowlist while arbitrary JWTs remain findings.",

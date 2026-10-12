@@ -23,7 +23,6 @@ export type Surface =
  */
 export type Tier = "A" | "B"
 
-/** A classified span awaiting redaction. */
 export interface Finding {
   /** Stable detector identity, e.g. "aws-access-key-id". */
   readonly kind: string
@@ -46,13 +45,11 @@ export interface Finding {
   readonly fingerprint?: string
 }
 
-/** The text that replaces a Finding's span. */
 export interface Placeholder<T extends Finding = Finding> {
   readonly text: string
   readonly finding: T
 }
 
-/** What a redaction pass produced. */
 export interface RedactionResult {
   /** The rewritten text. Identical to input when nothing was found. */
   readonly text: string

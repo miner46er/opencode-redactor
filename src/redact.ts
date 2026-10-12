@@ -1,5 +1,5 @@
 import { detect } from "./rules"
-import type { SessionScope } from "./session"
+import type { PlaceholderScope } from "./session"
 import type { Finding, RedactedFinding, RedactionResult } from "./shape"
 
 /**
@@ -27,7 +27,11 @@ export function resolveOverlaps(findings: readonly Finding[]): Finding[] {
   return accepted
 }
 
-export function redact(text: string, surface: "prose" | "code", session: SessionScope): RedactionResult {
+export function redact(
+  text: string,
+  surface: "prose" | "code",
+  session: PlaceholderScope,
+): RedactionResult {
   // detect() withholds Tier B on code by contract, but the result shape still
   // has to report those candidates as warnings, so scan the ungated set and
   // route by tier here.

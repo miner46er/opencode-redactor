@@ -3,7 +3,7 @@ import { appendFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { redact } from "./redact"
-import { createSessionScope } from "./session"
+import { createPlaceholderRegistry } from "./session"
 import type { RedactionResult, Surface } from "./shape"
 
 /**
@@ -109,22 +109,33 @@ function isCodeish(text: string): boolean {
 export default Plugin.define({
   id: "opencode-redactor",
   async setup(ctx) {
-    // A session scope owns placeholder stability for its lifetime. Keyed per
-    // plugin instance, which the host scopes to a directory rather than a
-    // conversation, so this is a process-lifetime map.
-    const session = createSessionScope()
+    // The host scopes a plugin instance to a directory, not a conversation, so
+    // the registry keys scopes by session ID. Sharing one scope across
+    // conversations would give the same credential the same fingerprint in two
+    // histories, which is the correlation the fingerprint exists to prevent.
+    const registry = createPlaceholderRegistry()
+
+    // Releasing on delete drops the conversation's fingerprint key, so a stored
+    // history cannot be checked against this process later. The subscription is
+    // an async iterable and is closed automatically when the plugin unloads.
+    void (async () => {
+      for await (const event of ctx.event.subscribe()) {
+        if (event.type === "session.deleted") {
+          registry.release(event.data.sessionID)
+        }
+      }
+    })()
 
     await ctx.session.hook("prompt", (event) => {
       const text = event.prompt?.text
       if (typeof text !== "string" || text.length === 0) return
       try {
-        const result = redact(text, "prose", session)
+        const result = redact(text, "prose", registry.for(event.sessionID))
         if (result.text !== text) {
           event.prompt.text = result.text
           audit(toRecords("prompt", result))
         }
       } catch (error) {
-        // Fail open but loud: the turn proceeds unscanned.
         process.stderr.write(`[redactor] prompt pass failed, sending unscanned: ${String(error)}\n`)
       }
     })
@@ -133,10 +144,11 @@ export default Plugin.define({
       if (event.status !== "completed" || !event.result) return
       try {
         const surface: Surface = isCodeish(JSON.stringify(event.result).slice(0, 4000)) ? "code" : "prose"
+        const scope = registry.for(event.sessionID)
         const records: AuditRecord[] = []
         walkStrings(event.result, (text) => {
           if (text.length === 0) return text
-          const result = redact(text, surface, session)
+          const result = redact(text, surface, scope)
           if (result.text !== text) records.push(...toRecords(surface, result))
           return result.text
         })
@@ -151,7 +163,7 @@ export default Plugin.define({
       try {
         const input = JSON.stringify(event.input ?? {})
         if (input.length === 0) return
-        const result = redact(input, "prose", session)
+        const result = redact(input, "prose", registry.for(event.sessionID))
         if (result.warned.length > 0 || result.redacted.length > 0) {
           audit(toRecords("tool", result))
         }
