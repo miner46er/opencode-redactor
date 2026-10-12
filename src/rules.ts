@@ -72,6 +72,26 @@ export const DENYLIST: readonly DenyEntry[] = [
       /^(?:ssh-rsa|ssh-ed25519|ecdsa-sha2-[a-z0-9-]+|ssh-dss)[ \t]|^AAAAB3NzaC1yc2E|^AAAAC3NzaC1lZDI1NTE5/,
   },
   {
+    // Only URLs with no userinfo and no query: a password in userinfo is the
+    // connection-string rule's job, and a query may carry a token of its own.
+    reason: "a URL with no userinfo or query is an address, not a secret",
+    pattern: /^[a-z][a-z0-9+.-]*:\/\/[^\s@?#]*$/i,
+  },
+  {
+    // The lowercase head is what separates `process.env.X` from dotted
+    // provider formats: a JWT starts "eyJ" and a SendGrid key starts "SG.".
+    // A password shaped like this is missed rather than partly redacted,
+    // which spec 19 ranks as the lesser harm.
+    reason: "a dotted identifier is a reference to where a secret lives, such as process.env.X",
+    pattern: /^[a-z_$][a-z0-9_$]*(?:\.[A-Za-z_$][\w$]*)+$/,
+  },
+  {
+    // Anchored on a real root so a base64 secret that happens to start with "/"
+    // is not mistaken for a path.
+    reason: "an absolute filesystem path points at where a secret is stored",
+    pattern: /^(?:\/(?:home|Users|etc|usr|var|run|opt|tmp|srv|mnt|root|private)|~)\/[\w.\/-]*$/,
+  },
+  {
     reason: "a certificate body (MII-prefixed DER) is public material",
     pattern: /^MII[A-Za-z0-9+/]{30,}={0,2}$/,
   },
@@ -175,13 +195,38 @@ export const DETECTORS: readonly Detector[] = [
   {
     kind: "connection-string-password",
     tier: "A",
-    pattern: /\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|rediss?|amqps?|mssql|ftps?|smtps?|https?):\/\/[^\s:/@]{1,64}:([^\s/@]{3,128})@/gid,
+    // The password runs to the LAST "@" before the path. An unencoded "@" in a
+    // password is common in practice, and stopping at the first one would
+    // redact a prefix and leave the rest in the output.
+    pattern: /\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|rediss?|amqps?|mssql|ftps?|smtps?|https?):\/\/[^\s:/@]{1,64}:([^\s/"'`<>]{3,128})@/gid,
+  },
+  {
+    // The netrc grammar is the anchor: a password token only counts after a
+    // machine (or default) entry, so ordinary prose about passwords never matches.
+    kind: "netrc-password",
+    tier: "A",
+    pattern: /\b(?:machine\s+\S+|default)(?:\s+(?:login|account)\s+\S+)*\s+password\s+(\S+)/gd,
   },
   {
     kind: "generic-secret",
     tier: "B",
     entropy: DEFAULT_ENTROPY_FLOOR,
-    pattern: /\b[A-Za-z0-9_-]{0,40}(?:key|secret|token|password|passwd|credential)[A-Za-z0-9_-]{0,40}[ \t]*[:=][ \t]*(?:"([^"\s]{16,})"|'([^'\s]{16,})'|([A-Za-z0-9+/=_\-]{16,}))/gid,
+    // The key may be quoted (JSON, Python dicts) and the operator may be Go's
+    // ":=" or Ruby's "=>". An unquoted value runs to whitespace or a shell
+    // metacharacter, since a shell could not have read it past one; only a
+    // trailing code delimiter is dropped, and it may not open with "[" so an
+    // emitted placeholder can never be a value. Stopping at the first punctuation
+    // instead would redact a prefix and leave the rest of the password behind.
+    pattern:
+      /\b[A-Za-z0-9_-]{0,40}(?:key|secret|token|password|passwd|credential)[A-Za-z0-9_-]{0,40}["']?[ \t]*(?::=|=>|[:=])[ \t]*(?:"([^"\s]{16,})"|'([^'\s]{16,})'|([^\s"'`;&|<>[][^\s"'`;&|<>]{14,}[^\s"'`;&|<>,)\]}]))/gid,
+  },
+  {
+    // An Authorization scheme followed by its credential. Opaque bearer tokens
+    // have no provider prefix, so this is entropy evidence like generic-secret.
+    kind: "authorization-header",
+    tier: "B",
+    entropy: DEFAULT_ENTROPY_FLOOR,
+    pattern: /\b(?:Bearer|Basic)[ \t]+([A-Za-z0-9._~+/-]{16,}=*)(?![A-Za-z0-9._~+/=-])/gid,
   },
 ]
 
@@ -245,6 +290,33 @@ function isDenied(value: string): boolean {
  */
 export function appliesHere(tier: Tier, surface: TextClass): boolean {
   return tier === "A" || surface === "prose"
+}
+
+/**
+ * A line that only source would contain. Config formats (.env, JSON, YAML) are
+ * deliberately not code: they are where credentials live, and calling them code
+ * would downgrade every Tier B hit in them to a warning. That is also why "#"
+ * comments, braces on their own, and `export NAME=` shell lines do not count.
+ */
+const CODE_LINE =
+  /=>|\bfunction\b|^\s*(?:const|let|var|import|from|def|class|fn|func|package|return|#include)\b|^\s*export\s+(?:default|const|let|var|function|class|async|type|interface|enum)\b|^\s*export\s*[{*]|^\s*(?:\/\/|\/\*)|^\s*\.\w+\(|;\s*$|\)\s*\{\s*$|<\/?[a-z][a-z0-9-]*[\s>/]/
+
+/** `cat -n` and editor-style gutters, which would hide a line's first token. */
+const LINE_NUMBER_GUTTER = /^\s*\d+(?:\t|\s*[|:]\s?)/
+
+/**
+ * Classifies text by the share of its non-blank lines that only source would
+ * contain. Must be given the text itself: a JSON-encoded string is one line, so
+ * any single code token anywhere in it would decide the whole class.
+ */
+export function textClassOf(text: string): TextClass {
+  const lines = text
+    .split("\n", 40)
+    .map((line) => line.replace(LINE_NUMBER_GUTTER, ""))
+    .filter((line) => line.trim().length > 0)
+  if (lines.length === 0) return "prose"
+  const code = lines.filter((line) => CODE_LINE.test(line)).length
+  return code / lines.length > 0.3 ? "code" : "prose"
 }
 
 /**

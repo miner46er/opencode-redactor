@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
-import { DENYLIST, DETECTORS, detect, shannonEntropy } from "./rules"
+import { BENIGN } from "./corpus"
+
+import { DENYLIST, DETECTORS, detect, shannonEntropy, textClassOf } from "./rules"
 import { redact, resolveOverlaps } from "./redact"
 import { createPlaceholderRegistry, createPlaceholderScope } from "./session"
 import type { Finding } from "./shape"
@@ -62,7 +64,7 @@ describe("registry shape", () => {
     const tierA = DETECTORS.filter((detector) => detector.tier === "A")
     const tierB = DETECTORS.filter((detector) => detector.tier === "B")
     expect(tierA.length).toBeGreaterThanOrEqual(15)
-    expect(tierB.length).toBe(2)
+    expect(tierB.length).toBe(3)
     expect(tierB.length).toBeLessThan(tierA.length)
   })
 })
@@ -134,6 +136,36 @@ describe("detect: Tier B", () => {
   })
 })
 
+describe("textClassOf", () => {
+  // The class decides whether Tier B redacts or only warns, so calling a config
+  // file "code" lets its passwords through to the provider.
+  const PROSE: ReadonlyArray<readonly [string, string]> = [
+    ["a .env file with export lines and comments", "# production\nexport DB_PASSWORD=Xk9mQ2vL8pR4tW7zB3nJ\nexport API_TOKEN=Qw8eR7tY6uI5oP4aS3dF\n"],
+    ["a plain .env file", "DB_HOST=localhost\nDB_PASSWORD=Xk9mQ2vL8pR4tW7zB3nJ\n"],
+    ["a JSON config", '{\n  "Database": {\n    "Host": "db.internal",\n    "Password": "Vq7Lm2Xc9Rt4Wz8Pk3Nb6Hy1"\n  }\n}'],
+    ["a YAML config", "database:\n  host: db.internal\n  password: Vq7Lm2Xc9Rt4Wz8Pk3Nb6Hy1\n"],
+    ["prose with one inline HTML tag", "Deploy notes for today.\nSee the <a href> in the runbook.\nRotate the key after.\nThen tell the on-call."],
+    ["a markdown bullet list", "* rotate keys\n* redeploy\n* verify"],
+  ]
+  const CODE: ReadonlyArray<readonly [string, string]> = [
+    ["TypeScript", "import { x } from './x'\n\nexport const y = (a: number) => a + 1\n\nfunction z() {\n  return y(2);\n}"],
+    ["Python", "import os\n\ndef handler(event):\n    value = os.environ['X']\n    return value\n"],
+    ["source shown with a line-number gutter", "1\timport os\n2\t\n3\tdef handler(event):\n4\t    return event\n"],
+  ]
+
+  for (const [label, text] of PROSE) {
+    test(`${label} is prose`, () => expect(textClassOf(text)).toBe("prose"))
+  }
+  for (const [label, text] of CODE) {
+    test(`${label} is code`, () => expect(textClassOf(text)).toBe("code"))
+  }
+
+  test("a minified bundle is code", () => {
+    const bundle = BENIGN.find((fixture) => fixture.label === "minified-js-bundle")?.text ?? ""
+    expect(textClassOf(bundle)).toBe("code")
+  })
+})
+
 describe("shannonEntropy", () => {
   test("a single repeated character carries no information", () => {
     expect(shannonEntropy("aaaaaaaa")).toBe(0)
@@ -169,6 +201,9 @@ describe("deny-list", () => {
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF7a1c2e3b4d5f60718293a4b5c6d7e8f9a0b1c2d3e4 user@host",
       'public_key = "AAAAB3NzaC1yc2EAAAADAQABAAABgQDf7a1c2e3b4d5f60718293a4b5c6d7e8f9012345678a9b0c1d2e3f4a5b6c7d8"',
     ].join("\n"),
+    `"token_uri": "https://oauth2.googleapis.com/token"`,
+    `password: process.env.DATABASE_PASSWORD_PRIMARY,`,
+    `SSL_KEY_FILE=/etc/ssl/private/server.key`,
     `tls_key = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy0f7n2x4v6b8d0"`,
   ]
 

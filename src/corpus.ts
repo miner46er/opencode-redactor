@@ -221,7 +221,7 @@ The runner reloads it on the next tick and never writes it to disk.`,
     label: "postgres-connection-string",
     kind: "connection-string-password",
     tier: "A",
-    value: "postgres://app_user:S3cretFakeP4ss@db.staging.example.com:5432/payments",
+    value: "S3cretFakeP4ss",
     context: `const pool = new Pool({ connectionString: "postgres://app_user:S3cretFakeP4ss@db.staging.example.com:5432/payments" })`,
   },
   {
@@ -235,6 +235,95 @@ api_key = "kQ3mZx8TnVw2RbYpLdFgHjKsQ4mXzCnBvWrTyUiOpAsDfGhJ"
 token_ttl = 3600
 
 Reverting that line unblocked the rollout.`,
+  },
+  {
+    label: "json-quoted-key",
+    kind: "generic-secret",
+    tier: "B",
+    value: "Vq7Lm2Xc9Rt4Wz8Pk3Nb6Hy1",
+    context: `// appsettings.Production.json
+{
+  "Logging": { "LogLevel": { "Default": "Warning" } },
+  "Database": {
+    "Host": "db.internal",
+    "Password": "Vq7Lm2Xc9Rt4Wz8Pk3Nb6Hy1"
+  }
+}`,
+  },
+  {
+    label: "python-dict-quoted-key",
+    kind: "generic-secret",
+    tier: "B",
+    value: "Tz4Kp9Wm2Qx7Rv3Ld8Nc5Bh6",
+    context: `CLIENT_CONFIG = {'base_url': 'https://api.example.com', 'api_key': 'Tz4Kp9Wm2Qx7Rv3Ld8Nc5Bh6'}`,
+  },
+  {
+    label: "go-short-variable-declaration",
+    kind: "generic-secret",
+    tier: "B",
+    value: "Jm8Rx3Vt6Lq1Wp9Zk4Nd7Cb2",
+    context: `func client() *http.Client {
+	apiToken := "Jm8Rx3Vt6Lq1Wp9Zk4Nd7Cb2"
+	return newClient(apiToken)
+}`,
+  },
+  {
+    label: "ruby-hash-rocket",
+    kind: "generic-secret",
+    tier: "B",
+    value: "Hx5Np2Rk8Vm3Tq9Lw6Zc1Bd4",
+    context: `Stripe.configure(:webhook_secret => "Hx5Np2Rk8Vm3Tq9Lw6Zc1Bd4", :timeout => 30)`,
+  },
+  {
+    label: "env-password-with-punctuation",
+    kind: "generic-secret",
+    tier: "B",
+    value: "Xk9#mQ2!vL8pR4@tW7zB.n3J",
+    context: `# .env.local
+DB_HOST=localhost
+DB_PASSWORD=Xk9#mQ2!vL8pR4@tW7zB.n3J
+DB_POOL=10`,
+  },
+  {
+    label: "env-password-symbol-early",
+    kind: "generic-secret",
+    tier: "B",
+    value: "P@ssw0rd-Rk7vT2mX9qL4wZ",
+    context: `export SMTP_PASSWORD=P@ssw0rd-Rk7vT2mX9qL4wZ`,
+  },
+  {
+    label: "connection-string-at-in-password",
+    kind: "connection-string-password",
+    tier: "A",
+    value: "Fk3@pR9!vZ",
+    context: `MYSQL_URL=mysql://svc_orders:Fk3@pR9!vZ@mysql.internal:3306/orders`,
+  },
+  {
+    label: "authorization-bearer-opaque",
+    kind: "authorization-header",
+    tier: "B",
+    value: "Wq8Zt3Lk6Xm1Rv9Pn4Bc7Hd2Jf5",
+    context: `curl -sS -H "Authorization: Bearer Wq8Zt3Lk6Xm1Rv9Pn4Bc7Hd2Jf5" https://api.example.com/v1/me`,
+  },
+  {
+    label: "authorization-basic-header",
+    kind: "authorization-header",
+    tier: "B",
+    value: "c3ZjX2RlcGxveTpUcjdLcTJYbTlWbjQ=",
+    context: `> GET /artifacts/latest HTTP/1.1
+> Host: nexus.internal
+> Authorization: Basic c3ZjX2RlcGxveTpUcjdLcTJYbTlWbjQ=
+> Accept: */*`,
+  },
+  {
+    label: "netrc-password",
+    kind: "netrc-password",
+    tier: "A",
+    value: "hunter2deploy",
+    context: `$ cat ~/.netrc
+machine api.heroku.com
+  login deploy@example.com
+  password hunter2deploy`,
   },
 ]
 
@@ -491,5 +580,38 @@ export const MAGIC = 0xdeadbeef`,
     text: `ci-runner authorized_keys entry:
 
 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDfw8LCj3sKDoj+vWYX+gueB7Z0pEtSmlKqUZgBMWII1KBQ4j0IlmpUcE5Qrc1kOAtS7UQgHYRJChnk1L7CS5D6qovw+eQObn+eE/X2V+PGxxGFZ368SChUzV5GDRghNlY/pR3dzfBBfwnbjZ1+FTySQ068ZBBjJVaFNeqNoFvVQekddrYZxiTrBZEP6NMJzaU7RwSmMTqkCl7Ypp3AUlOfAyJcdfLX/bCwQtle30pS+7HDLGoO2NyQXwVWf/Ppw5hoPzpRXYNQGu/8yAz6CzD48Ey4YIo6QIBpDyTDiklggkR1gDx2+z+jnvBHVUT6jN2/tXP/VU180FrFB6a7 deploy@ci.example.com`,
+  },
+  {
+    label: "oauth-endpoint-urls",
+    reason:
+      "OAuth endpoints in a service-account file sit under token-shaped keys, but a URL with no userinfo is an address. Credentials in a URL's userinfo are a separate Tier A rule.",
+    text: `{
+  "type": "service_account",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+}`,
+  },
+  {
+    label: "secret-read-from-environment",
+    reason:
+      "A credential-named key assigned from another variable. The value is a reference to where the secret lives, not the secret, and it is what correctly written code looks like.",
+    text: `const db = new Client({
+  password: process.env.DATABASE_PASSWORD_PRIMARY,
+  apiKey: config.services.payments.apiKey,
+})`,
+  },
+  {
+    label: "basic-auth-in-prose",
+    reason:
+      "The words Basic and Bearer in an explanation of HTTP auth schemes. Only an actual credential following the scheme name is a secret.",
+    text: "The gateway accepts Basic authentication for legacy clients and Bearer tokens for everything else; see the auth guide for details.",
+  },
+  {
+    label: "env-dump-paths",
+    reason:
+      "Shell environment output. Filesystem paths under credential-named variables point at where a secret is stored, they are not the secret.",
+    text: `GOOGLE_APPLICATION_CREDENTIALS=/home/dev/.config/gcloud/application_default_credentials.json
+SSL_KEY_FILE=/etc/ssl/private/server.key
+PWD=/home/dev/projects/payments-service`,
   },
 ]

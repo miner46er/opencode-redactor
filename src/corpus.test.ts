@@ -25,10 +25,20 @@ function kindsOf(findings: readonly Finding[]): string {
   return findings.length === 0 ? "no findings" : findings.map((finding) => finding.kind).join(", ")
 }
 
-function expectKind(findings: readonly Finding[], kind: string, label: string, surface: TestSurface): void {
+/**
+ * The finding must cover the fixture's value exactly. Matching the kind alone
+ * would pass a detector that stops partway through the value, and a partially
+ * redacted credential is worse than a missed one.
+ */
+function expectSecret(findings: readonly Finding[], fixture: SecretFixture, surface: TestSurface): void {
+  const ofKind = findings.filter((finding) => finding.kind === fixture.kind)
   expect(
-    findings.some((finding) => finding.kind === kind),
-    `${label}: expected kind "${kind}" on surface "${surface}", got ${kindsOf(findings)}`,
+    ofKind.length > 0,
+    `${fixture.label}: expected kind "${fixture.kind}" on surface "${surface}", got ${kindsOf(findings)}`,
+  ).toBe(true)
+  expect(
+    ofKind.some((finding) => finding.value === fixture.value),
+    `${fixture.label}: a "${fixture.kind}" finding must cover the whole value, not part of it`,
   ).toBe(true)
 }
 
@@ -43,8 +53,8 @@ function expectNoFindings(fixture: BenignFixture, surface: TestSurface): void {
 
 describe("corpus integrity", () => {
   it("keeps the exact fixture counts", () => {
-    expect(SECRETS, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(22)
-    expect(BENIGN, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(26)
+    expect(SECRETS, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(32)
+    expect(BENIGN, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(30)
   })
 
   it("embeds every secret value verbatim in its context", () => {
@@ -85,11 +95,11 @@ for (const [kind, fixtures] of byKind(TIER_A)) {
   describe(`tier A / ${kind}`, () => {
     for (const fixture of fixtures) {
       it(`${fixture.label} matches on prose`, () => {
-        expectKind(detect(fixture.context, "prose"), kind, fixture.label, "prose")
+        expectSecret(detect(fixture.context, "prose"), fixture, "prose")
       })
 
       it(`${fixture.label} matches on code`, () => {
-        expectKind(detect(fixture.context, "code"), kind, fixture.label, "code")
+        expectSecret(detect(fixture.context, "code"), fixture, "code")
       })
     }
   })
@@ -99,7 +109,7 @@ for (const [kind, fixtures] of byKind(TIER_B)) {
   describe(`tier B / ${kind}`, () => {
     for (const fixture of fixtures) {
       it(`${fixture.label} matches on prose`, () => {
-        expectKind(detect(fixture.context, "prose"), kind, fixture.label, "prose")
+        expectSecret(detect(fixture.context, "prose"), fixture, "prose")
       })
     }
   })

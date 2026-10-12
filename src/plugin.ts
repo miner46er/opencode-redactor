@@ -3,8 +3,9 @@ import { appendFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { redact } from "./redact"
+import { textClassOf } from "./rules"
 import { createPlaceholderRegistry } from "./session"
-import type { Channel, RedactedFinding, RedactionResult, TextClass } from "./shape"
+import type { Channel, RedactedFinding, RedactionResult } from "./shape"
 
 /**
  * Redacts credentials from OpenCode traffic before it reaches a model.
@@ -97,16 +98,6 @@ function walkStrings(value: unknown, apply: (s: string) => string, depth = 0): v
   }
 }
 
-/** Tool output that looks like source is held to a stricter bar than prose. */
-function isCodeish(text: string): boolean {
-  const lines = text.split("\n", 40)
-  let code = 0
-  for (const line of lines) {
-    if (/^\s*[.#/]|=>|function |const |let |var |import |export |def |class |<\/?[a-z]/i.test(line)) code++
-  }
-  return lines.length > 0 && code / lines.length > 0.3
-}
-
 export default Plugin.define({
   id: "opencode-redactor",
   async setup(ctx) {
@@ -133,8 +124,7 @@ export default Plugin.define({
       try {
         // A pasted file is code even though it arrived as chat, and the Tier B
         // gate exists to keep source readable.
-        const classification: TextClass = isCodeish(text) ? "code" : "prose"
-        const result = redact(text, classification, registry.for(event.sessionID))
+        const result = redact(text, textClassOf(text), registry.for(event.sessionID))
         if (result.text !== text) {
           event.prompt.text = result.text
           audit(toRecords("prompt", result))
@@ -172,12 +162,15 @@ export default Plugin.define({
     await ctx.tool.hook("execute.after", (event) => {
       if (event.status !== "completed" || !event.result) return
       try {
-        const text: TextClass = isCodeish(JSON.stringify(event.result).slice(0, 4000)) ? "code" : "prose"
         const scope = registry.for(event.sessionID)
         const records: AuditRecord[] = []
+        // Each string is classified on its own text. Classifying the result as
+        // a whole meant classifying its JSON encoding, which is a single line, so
+        // one code-like token anywhere turned a `cat .env` into "code" and let
+        // its Tier B secrets through as warnings.
         walkStrings(event.result, (value) => {
           if (value.length === 0) return value
-          const result = redact(value, text, scope)
+          const result = redact(value, textClassOf(value), scope)
           if (result.text !== value) records.push(...toRecords("tool-output", result))
           return result.text
         })

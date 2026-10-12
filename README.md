@@ -63,13 +63,19 @@ it once, and a placeholder is never itself detected as a credential.
 
 Two tiers. **Tier A** is anchored provider formats (`AKIA...`, `ghp_...`, PEM
 blocks). These redact unconditionally. **Tier B** is entropy plus a keyword, and
-fires on unprefixed values like bare `.env` entries. Tier B redacts in prose and
+fires on unprefixed values: bare `.env` entries, quoted JSON or dict keys, and
+`Authorization: Bearer`/`Basic` credentials. Tier B redacts in prose and
 only warns in code, because source is high-entropy and a redactor that mangles a
 minified bundle gets uninstalled.
 
 Documented example keys (`AKIAIOSFODNN7EXAMPLE`, `sk_test_4eC39HqLyjWDarjtT1zdp7dc`)
 are suppressed. So are UUIDs, git SHAs, hex digests, bcrypt hashes, SSH public
-keys, and bare base64 certificate bodies.
+keys, bare base64 certificate bodies, plain URLs, variable references such as
+`process.env.X`, and absolute file paths.
+
+Pasted text and each tool output string are classified as code or prose on
+their own. Config formats (`.env`, JSON, YAML) count as prose, because that is
+where credentials live.
 
 ## What the model cannot do
 
