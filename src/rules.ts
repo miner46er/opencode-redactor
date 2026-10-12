@@ -74,16 +74,23 @@ export const DENYLIST: readonly DenyEntry[] = [
   {
     // Only URLs with no userinfo and no query: a password in userinfo is the
     // connection-string rule's job, and a query may carry a token of its own.
-    reason: "a URL with no userinfo or query is an address, not a secret",
-    pattern: /^[a-z][a-z0-9+.-]*:\/\/[^\s@?#]*$/i,
+    // Slack and Discord webhook URLs are the exception: the credential is in
+    // the path, so those hosts are carved out and the webhook rules redact the
+    // whole URL instead of this rule dropping it.
+    reason:
+      "a URL with no userinfo or query is an address, not a secret, unless it is a chat webhook endpoint",
+    pattern:
+      /^(?!https?:\/\/(?:hooks\.slack\.com\/(?:services|workflows|triggers)\/|discord(?:app)?\.com\/api\/webhooks\/))[a-z][a-z0-9+.-]*:\/\/[^\s@?#]*$/i,
   },
   {
     // The lowercase head is what separates `process.env.X` from dotted
     // provider formats: a JWT starts "eyJ" and a SendGrid key starts "SG.".
     // A password shaped like this is missed rather than partly redacted,
-    // which spec 19 ranks as the lesser harm.
+    // which spec 19 ranks as the lesser harm. Vault service and batch tokens
+    // (hvs./hvb.) are lowercase-headed dotted runs too, so the lookahead
+    // carves them out rather than let the reference rule swallow a credential.
     reason: "a dotted identifier is a reference to where a secret lives, such as process.env.X",
-    pattern: /^[a-z_$][a-z0-9_$]*(?:\.[A-Za-z_$][\w$]*)+$/,
+    pattern: /^(?!hv[bs]\.)[a-z_$][a-z0-9_$]*(?:\.[A-Za-z_$][\w$]*)+$/,
   },
   {
     // Anchored on a real root so a base64 secret that happens to start with "/"
@@ -92,8 +99,12 @@ export const DENYLIST: readonly DenyEntry[] = [
     pattern: /^(?:\/(?:home|Users|etc|usr|var|run|opt|tmp|srv|mnt|root|private)|~)\/[\w.\/-]*$/,
   },
   {
-    reason: "a certificate body (MII-prefixed DER) is public material",
-    pattern: /^MII[A-Za-z0-9+/]{30,}={0,2}$/,
+    // A PKCS#8 or PKCS#1 private key is MII-prefixed too: DER puts SEQUENCE
+    // then INTEGER version 0, which lands "IBA" at characters 6-8 of the
+    // base64. Certificates and public keys never carry it, so excluding "IBA"
+    // keeps private keys while still dropping a certificate body.
+    reason: "a certificate body (MII-prefixed DER) is public material; a private key body is not",
+    pattern: /^MII[A-Za-z0-9+/]{3}(?!IBA)[A-Za-z0-9+/]{27,}={0,2}$/,
   },
 ]
 
@@ -107,7 +118,7 @@ export const DETECTORS: readonly Detector[] = [
   {
     kind: "aws-access-key-id",
     tier: "A",
-    pattern: /\b(?:A3T[A-Z0-9]|AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASCA)[A-Z0-9]{16}(?![A-Z0-9])/gd,
+    pattern: /\b(?:A3T[A-Z0-9]|AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASCA)[A-Z0-9]{16}(?![A-Za-z0-9])/gd,
   },
   {
     kind: "aws-secret-access-key",
@@ -124,10 +135,11 @@ export const DETECTORS: readonly Detector[] = [
   {
     kind: "slack-token",
     tier: "A",
-    // \b cannot be the terminator here: it treats "-" as a boundary, so a
-    // token with more hyphen groups than the pattern allows would match on a
-    // prefix and leave the tail behind.
-    pattern: /\bxox[bp]-[A-Za-z0-9-]{10,}(?![A-Za-z0-9-])/gd,
+    // The letter set covers xoxa app, xoxb bot, xoxp user, xoxr refresh and
+    // xoxs/xoxe workspace tokens. \b cannot be the terminator here: it treats
+    // "-" as a boundary, so a token with more hyphen groups than the pattern
+    // allows would match on a prefix and leave the tail behind.
+    pattern: /\bxox[abprse]-[A-Za-z0-9-]{10,}(?![A-Za-z0-9-])/gd,
   },
   {
     kind: "stripe-live-key",
@@ -144,7 +156,9 @@ export const DETECTORS: readonly Detector[] = [
   {
     kind: "openai-api-key",
     tier: "A",
-    pattern: /\bsk-(?!ant-)(?:proj-)?[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/gd,
+    // "or-v1-" is excluded so OpenRouter keys are reported as their own kind
+    // instead of being consumed here as an OpenAI key.
+    pattern: /\bsk-(?!ant-|or-v1-)(?:proj-)?[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/gd,
   },
   {
     kind: "anthropic-api-key",
@@ -152,9 +166,13 @@ export const DETECTORS: readonly Detector[] = [
     pattern: /\bsk-ant-(?:api\d{2}-)?[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/gd,
   },
   {
+    // The alternation covers every GitLab token family: glpat personal access,
+    // glptt pipeline trigger, gldt deploy, glrt runner, glcbt CI build, gloas
+    // and glsoat OAuth, glffct feature-flag client, glagent agent, glimt
+    // incoming mail.
     kind: "gitlab-pat",
     tier: "A",
-    pattern: /\bglpat-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/gd,
+    pattern: /\bgl(?:pat|ptt|dt|rt|cbt|oas|soat|ffct|agent|imt)-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/gd,
   },
   {
     kind: "npm-token",
@@ -172,7 +190,7 @@ export const DETECTORS: readonly Detector[] = [
     // treating it as a credential would fire on ordinary Twilio usage.
     kind: "twilio-api-key",
     tier: "A",
-    pattern: /\bSK[0-9a-f]{32}(?![0-9a-fA-F])/gd,
+    pattern: /\bSK[0-9a-f]{32}(?![A-Za-z0-9])/gd,
   },
   {
     // Test-mode keys authenticate against Stripe's real API, so they redact.
@@ -206,6 +224,197 @@ export const DETECTORS: readonly Detector[] = [
     kind: "netrc-password",
     tier: "A",
     pattern: /\b(?:machine\s+\S+|default)(?:\s+(?:login|account)\s+\S+)*\s+password\s+(\S+)/gd,
+  },
+  {
+    // A fine-grained PAT keeps its own kind so a policy can treat it apart from
+    // the classic gh[pousr]_ tokens; the negative lookahead rejects an
+    // over-long alphanumeric tail instead of prefix-matching it.
+    kind: "github-fine-grained-pat",
+    tier: "A",
+    pattern: /\bgithub_pat_[A-Za-z0-9]{22}_[A-Za-z0-9]{59}(?![A-Za-z0-9])/gd,
+  },
+  {
+    // The app-level token does not fit the xox[baprse] shape: it is
+    // "xapp-<version>-<app id>-<id>-<secret>" with mixed case.
+    kind: "slack-app-token",
+    tier: "A",
+    pattern: /\bxapp-\d-[A-Z0-9]+-\d+-[a-z0-9]+(?![A-Za-z0-9-])/gd,
+  },
+  {
+    // The credential is the whole URL, not only the trailing secret. The
+    // generic "a URL is an address" deny entry carves these hosts out so it
+    // cannot swallow a live webhook.
+    kind: "slack-webhook",
+    tier: "A",
+    pattern:
+      /\bhttps:\/\/hooks\.slack\.com\/(?:services|workflows|triggers)\/T[A-Z0-9]+\/[A-Z0-9]+\/[A-Za-z0-9]{20,}(?![A-Za-z0-9])/gd,
+  },
+  {
+    // Same whole-URL reasoning as slack-webhook; the URL deny entry carves out
+    // Discord's webhook path.
+    kind: "discord-webhook",
+    tier: "A",
+    pattern: /\bhttps:\/\/(?:discord|discordapp)\.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]{60,}(?![A-Za-z0-9_-])/gd,
+  },
+  {
+    kind: "telegram-bot-token",
+    tier: "A",
+    pattern: /\b\d{8,10}:AA[A-Za-z0-9_-]{33}(?![A-Za-z0-9_-])/gd,
+  },
+  {
+    kind: "huggingface-token",
+    tier: "A",
+    pattern: /\bhf_[A-Za-z]{34}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "groq-api-key",
+    tier: "A",
+    pattern: /\bgsk_[A-Za-z0-9]{52}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "replicate-api-token",
+    tier: "A",
+    pattern: /\br8_[A-Za-z0-9]{37}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "xai-api-key",
+    tier: "A",
+    pattern: /\bxai-[A-Za-z0-9]{80}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "perplexity-api-key",
+    tier: "A",
+    pattern: /\bpplx-[A-Za-z0-9]{48}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "openrouter-api-key",
+    tier: "A",
+    pattern: /\bsk-or-v1-[a-f0-9]{64}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "stripe-webhook-secret",
+    tier: "A",
+    pattern: /\bwhsec_[A-Za-z0-9]{32,}(?![A-Za-z0-9])/gd,
+  },
+  {
+    // The captured group is the key; the connection string around it is context.
+    // \b and the trailing lookahead keep a longer alphanumeric run from being
+    // matched on its first 88 chars.
+    kind: "azure-storage-account-key",
+    tier: "A",
+    pattern: /\bAccountKey=([A-Za-z0-9+/]{86}==)(?![A-Za-z0-9+/=])/gd,
+  },
+  {
+    // The "~" in every client secret keeps it out of the dotted-identifier deny
+    // entry, so only the lookbehind/lookahead are needed to stop a match inside
+    // a longer mixed run.
+    kind: "azure-ad-client-secret",
+    tier: "A",
+    pattern: /(?<![A-Za-z0-9_~.-])[A-Za-z0-9_~.]{3}\dQ~[A-Za-z0-9_~.-]{31,34}(?![A-Za-z0-9_~.-])/gd,
+  },
+  {
+    // Only the signature value is a credential; the "?sig="/"&sig=" markers are
+    // context, so this one captures rather than matching the whole query.
+    kind: "azure-sas-signature",
+    tier: "A",
+    pattern: /[?&]sig=([A-Za-z0-9%+/=]{40,})(?![A-Za-z0-9%+/=])/gid,
+  },
+  {
+    // The provider prefix stays in the value so the 64-hex digest deny entry
+    // cannot suppress it.
+    kind: "digitalocean-token",
+    tier: "A",
+    pattern: /\bdo[por]_v1_[a-f0-9]{64}(?![A-Za-z0-9])/gd,
+  },
+  {
+    // hvs./hvb. is a lowercase-headed dotted run, so the dotted-identifier deny
+    // entry carves these prefixes out rather than swallow a live token.
+    kind: "vault-token",
+    tier: "A",
+    pattern: /\bhv[sb]\.[A-Za-z0-9_-]{90,}(?![A-Za-z0-9_-])/gd,
+  },
+  {
+    kind: "terraform-cloud-token",
+    tier: "A",
+    pattern: /\b[A-Za-z0-9]{14}\.atlasv1\.[A-Za-z0-9_=-]{60,}(?![A-Za-z0-9_=-])/gd,
+  },
+  {
+    kind: "databricks-token",
+    tier: "A",
+    // The terminator includes "-" so the optional "-<region>" suffix cannot be
+    // backtracked away, which would leave "dapi<32 hex>" matched against the
+    // front of a longer hyphenated token.
+    pattern: /\bdapi[a-f0-9]{32}(?:-\d)?(?![A-Za-z0-9-])/gd,
+  },
+  {
+    kind: "shopify-token",
+    tier: "A",
+    pattern: /\bshp(?:at|ca|pa|ss)_[a-fA-F0-9]{32}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "pypi-token",
+    tier: "A",
+    pattern: /\bpypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,}(?![A-Za-z0-9_-])/gd,
+  },
+  {
+    kind: "dockerhub-pat",
+    tier: "A",
+    pattern: /\bdckr_pat_[A-Za-z0-9_-]{27,}(?![A-Za-z0-9_-])/gd,
+  },
+  {
+    kind: "postman-api-key",
+    tier: "A",
+    pattern: /\bPMAK-[a-f0-9]{24}-[a-f0-9]{34}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "linear-api-key",
+    tier: "A",
+    pattern: /\blin_api_[A-Za-z0-9]{40}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "atlassian-api-token",
+    tier: "A",
+    pattern: /\bATATT3[A-Za-z0-9_=-]{180,}(?![A-Za-z0-9_=-])/gd,
+  },
+  {
+    // Two token families share Grafana's "gl" namespace; one kind with an
+    // alternation means a policy keyed on kind covers both.
+    kind: "grafana-token",
+    tier: "A",
+    pattern: /\b(?:glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}|glc_[A-Za-z0-9+/]{32,}={0,2})(?![A-Za-z0-9+/=])/gd,
+  },
+  {
+    kind: "sentry-token",
+    tier: "A",
+    pattern: /\bsntry[su]_[A-Za-z0-9+/=_-]{40,}(?![A-Za-z0-9+/=_-])/gd,
+  },
+  {
+    // sbp_ is the account access token; sb_secret_ is the newer service key.
+    kind: "supabase-token",
+    tier: "A",
+    pattern: /\b(?:sbp_[a-f0-9]{40}|sb_secret_[A-Za-z0-9_-]{30,})(?![A-Za-z0-9_-])/gd,
+  },
+  {
+    kind: "newrelic-api-key",
+    tier: "A",
+    pattern: /\bNRAK-[A-Z0-9]{27}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "square-token",
+    tier: "A",
+    pattern: /\b(?:sq0atp-[A-Za-z0-9_-]{22}|sq0csp-[A-Za-z0-9_-]{43})(?![A-Za-z0-9_-])/gd,
+  },
+  {
+    kind: "age-secret-key",
+    tier: "A",
+    // age uses bech32's alphabet. The lookahead is over all alphanumerics, not
+    // that alphabet, so any longer run is rejected rather than prefix-matched.
+    pattern: /\bAGE-SECRET-KEY-1[QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{58}(?![A-Za-z0-9])/gd,
+  },
+  {
+    kind: "firebase-fcm-server-key",
+    tier: "A",
+    pattern: /\bAAAA[A-Za-z0-9_-]{7}:APA91b[A-Za-z0-9_-]{100,}(?![A-Za-z0-9_-])/gd,
   },
   {
     kind: "generic-secret",

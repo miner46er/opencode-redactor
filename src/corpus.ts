@@ -325,6 +325,349 @@ machine api.heroku.com
   login deploy@example.com
   password hunter2deploy`,
   },
+  {
+    label: "github-fine-grained-pat-env",
+    kind: "github-fine-grained-pat",
+    tier: "A",
+    value: "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",
+    context: `# .env.local
+GITHUB_TOKEN=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
+GITHUB_OWNER=opencode-labs`,
+  },
+  {
+    label: "gitlab-pipeline-trigger-token",
+    kind: "gitlab-pat",
+    tier: "A",
+    value: "glptt-acP6YQsRAhIabUOiYEfVGariMVtO",
+    context: `variables:
+  GITLAB_PIPELINE_TOKEN: glptt-acP6YQsRAhIabUOiYEfVGariMVtO
+  GITLAB_HOST: gitlab.example.com`,
+  },
+  {
+    label: "slack-refresh-token-xoxr",
+    kind: "slack-token",
+    tier: "A",
+    value: "xoxr-924281139949-456874089749-yutcuoummazeoyhlzmxtkbsf",
+    context: `$ grep token .env
+SLACK_REFRESH_TOKEN=xoxr-924281139949-456874089749-yutcuoummazeoyhlzmxtkbsf`,
+  },
+  {
+    label: "slack-app-token-config",
+    kind: "slack-app-token",
+    tier: "A",
+    value: "xapp-1-7V12B22B35-0098320841-xpdxc6w436py7g1cyy07dwr4wvwfq37hth7qx4vl",
+    context: `{
+  "slack": {
+    "appToken": "xapp-1-7V12B22B35-0098320841-xpdxc6w436py7g1cyy07dwr4wvwfq37hth7qx4vl",
+    "socketMode": true
+  }
+}`,
+  },
+  {
+    label: "slack-incoming-webhook-url",
+    kind: "slack-webhook",
+    tier: "A",
+    value: "https://hooks.slack.com/services/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",
+    context: `# .env.production
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/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
+SLACK_CHANNEL=#deploys`,
+  },
+  {
+    label: "discord-webhook-curl",
+    kind: "discord-webhook",
+    tier: "A",
+    value: "https://discord.com/api/webhooks/8528664580973078069/ujQc4uUci__VkxgBgPy9nf5fxyZGuZrdXl9ih5LxVVHRVSX-dUmiuS-waojhnB27",
+    context: `curl -sS -X POST https://discord.com/api/webhooks/8528664580973078069/ujQc4uUci__VkxgBgPy9nf5fxyZGuZrdXl9ih5LxVVHRVSX-dUmiuS-waojhnB27 -d @release.json`,
+  },
+  {
+    label: "telegram-bot-token-env",
+    kind: "telegram-bot-token",
+    tier: "A",
+    value: "0525789193:AA1BuqF_Gq42g0kkcDI3o5Yz262BJheEVDh",
+    context: `# .env.production
+TELEGRAM_BOT_TOKEN=0525789193:AA1BuqF_Gq42g0kkcDI3o5Yz262BJheEVDh
+TELEGRAM_CHAT_ID=-1001234567890`,
+  },
+  {
+    label: "huggingface-token-env",
+    kind: "huggingface-token",
+    tier: "A",
+    value: "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",
+    context: `# .env.local
+HUGGING_FACE_HUB_TOKEN=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
+HF_HOME=/home/dev/.cache/huggingface`,
+  },
+  {
+    label: "groq-api-key-env",
+    kind: "groq-api-key",
+    tier: "A",
+    value: "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",
+    context: `# .env.local
+GROQ_API_KEY=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`,
+  },
+  {
+    label: "replicate-api-token-env",
+    kind: "replicate-api-token",
+    tier: "A",
+    value: "r8_p9sD1gy7DlWOu80Aia6nDHEzjOmnLRugDag1I",
+    context: `# .env.local
+REPLICATE_API_TOKEN=r8_p9sD1gy7DlWOu80Aia6nDHEzjOmnLRugDag1I`,
+  },
+  {
+    label: "xai-api-key-env",
+    kind: "xai-api-key",
+    tier: "A",
+    value: "xai-Tq7kt4KBBLcSCnDEX8SHXasBjb6o79zfuJ51EtP3JmQavSb7UfQgmmhkYzLes902YmFXk3Sxe5DnllSF",
+    context: `# .env.local
+XAI_API_KEY=xai-Tq7kt4KBBLcSCnDEX8SHXasBjb6o79zfuJ51EtP3JmQavSb7UfQgmmhkYzLes902YmFXk3Sxe5DnllSF`,
+  },
+  {
+    label: "perplexity-api-key-env",
+    kind: "perplexity-api-key",
+    tier: "A",
+    value: "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",
+    context: `# .env.local
+PPLX_API_KEY=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`,
+  },
+  {
+    label: "openrouter-api-key-env",
+    kind: "openrouter-api-key",
+    tier: "A",
+    value: "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",
+    context: `# .env.local
+OPENROUTER_API_KEY=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`,
+  },
+  {
+    label: "stripe-webhook-secret-env",
+    kind: "stripe-webhook-secret",
+    tier: "A",
+    value: "whsec_pDyrcPG7wyAmmAArHHOY1eonkv4lLTfAwjM3TunR",
+    context: `# .env.production
+STRIPE_WEBHOOK_SECRET=whsec_pDyrcPG7wyAmmAArHHOY1eonkv4lLTfAwjM3TunR
+STRIPE_WEBHOOK_TOLERANCE=300`,
+  },
+  {
+    label: "azure-storage-account-key-connection-string",
+    kind: "azure-storage-account-key",
+    tier: "A",
+    value: "Sw2c65dBqyzFRezQ1qvw5wfRjjvm2/JeKKkoHCY+cOm7CeXB0WAlHLM+n1vJWA3BR8iYfsUYJ7n0hZRDX4vy+J==",
+    context: `AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=redactorstore;AccountKey=Sw2c65dBqyzFRezQ1qvw5wfRjjvm2/JeKKkoHCY+cOm7CeXB0WAlHLM+n1vJWA3BR8iYfsUYJ7n0hZRDX4vy+J==;EndpointSuffix=core.windows.net`,
+  },
+  {
+    label: "azure-ad-client-secret-env",
+    kind: "azure-ad-client-secret",
+    tier: "A",
+    value: "RPT1Q~wnff0lJkd6QEwXXhzUD4l1VT~c6t79vWP",
+    context: `# .env.production
+AZURE_CLIENT_ID=8f2b1c4d-0000-1111-2222-333344445555
+AZURE_CLIENT_SECRET=RPT1Q~wnff0lJkd6QEwXXhzUD4l1VT~c6t79vWP
+AZURE_TENANT_ID=44445555-6666-7777-8888-999900001111`,
+  },
+  {
+    label: "azure-blob-sas-signature",
+    kind: "azure-sas-signature",
+    tier: "A",
+    value: "S%ub5B9DSr6=Li/FfIrNcVFX20tJ2r04T0AUSRKWkhcpfFXD",
+    context: `https://redactorstore.blob.core.windows.net/exports/2026-03.csv?sv=2023-11-03&ss=b&srt=sco&sig=S%ub5B9DSr6=Li/FfIrNcVFX20tJ2r04T0AUSRKWkhcpfFXD`,
+  },
+  {
+    label: "digitalocean-token-env",
+    kind: "digitalocean-token",
+    tier: "A",
+    value: "dop_v1_65bfe27ee57f045aac299dc9b75cf49ba8a487c7a13fef339e8a199337ef401c",
+    context: `# .env.production
+DIGITALOCEAN_TOKEN=dop_v1_65bfe27ee57f045aac299dc9b75cf49ba8a487c7a13fef339e8a199337ef401c
+DIGITALOCEAN_REGION=fra1`,
+  },
+  {
+    label: "vault-service-token-shell",
+    kind: "vault-token",
+    tier: "A",
+    value: "hvs.IEyzFCaGlUZi63CiefEAHmGUrQo07DyPxnq2cgZLqZSTd8Gvf4rREDnmPy3dncdKAC4fjVNkvspalI9FiYznuYuaGCKGUGLL",
+    context: `$ export VAULT_TOKEN=hvs.IEyzFCaGlUZi63CiefEAHmGUrQo07DyPxnq2cgZLqZSTd8Gvf4rREDnmPy3dncdKAC4fjVNkvspalI9FiYznuYuaGCKGUGLL
+$ vault kv get secret/payments`,
+  },
+  {
+    label: "terraform-cloud-token-env",
+    kind: "terraform-cloud-token",
+    tier: "A",
+    value: "ceA61GPVijUAwi.atlasv1.CAEIRRO8rK3MOPETFxyuaHjyGF9V6cwSeWNijCUBeYDyvIVcOfZ-cxBi_Zt-9Fp8-",
+    context: `# .env.production
+TFC_TOKEN=ceA61GPVijUAwi.atlasv1.CAEIRRO8rK3MOPETFxyuaHjyGF9V6cwSeWNijCUBeYDyvIVcOfZ-cxBi_Zt-9Fp8-
+TF_CLOUD_ORGANIZATION=opencode-labs`,
+  },
+  {
+    label: "databricks-token-env",
+    kind: "databricks-token",
+    tier: "A",
+    value: "dapi1d5da364431b70806d37303d77757397-2",
+    context: `# .env.production
+DATABRICKS_TOKEN=dapi1d5da364431b70806d37303d77757397-2
+DATABRICKS_HOST=https://dbc.example.cloud.databricks.com`,
+  },
+  {
+    label: "shopify-access-token-env",
+    kind: "shopify-token",
+    tier: "A",
+    value: "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",
+    context: `# .env.production
+SHOPIFY_ACCESS_TOKEN=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
+SHOPIFY_STORE=redactor-labs.myshopify.com`,
+  },
+  {
+    label: "pypi-token-pypirc",
+    kind: "pypi-token",
+    tier: "A",
+    value: "pypi-AgEIcHlwaS5vcmclXbICm2B41LbfzcXF-5Ao4LKcIa69G5XE7yAcBqW5DkCcIHrmpXhiX",
+    context: `# ~/.pypirc
+[distutils]
+index-servers = pypi
+
+[pypi]
+username = __token__
+password = pypi-AgEIcHlwaS5vcmclXbICm2B41LbfzcXF-5Ao4LKcIa69G5XE7yAcBqW5DkCcIHrmpXhiX`,
+  },
+  {
+    label: "dockerhub-pat-config",
+    kind: "dockerhub-pat",
+    tier: "A",
+    value: "dckr_pat_Tq9C-h7uzuljaHTHfBI5Qel_6UOxxa",
+    context: `{
+  "auths": {
+    "https://index.docker.io/v1/": {
+      "auth": "dckr_pat_Tq9C-h7uzuljaHTHfBI5Qel_6UOxxa"
+    }
+  }
+}`,
+  },
+  {
+    label: "postman-api-key-env",
+    kind: "postman-api-key",
+    tier: "A",
+    value: "PMAK-ffd2d8e1e38eb6434477bd06-9e01580fb30710718cb4e4f87e5956c867",
+    context: `# .env.local
+POSTMAN_API_KEY=PMAK-ffd2d8e1e38eb6434477bd06-9e01580fb30710718cb4e4f87e5956c867`,
+  },
+  {
+    label: "linear-api-key-env",
+    kind: "linear-api-key",
+    tier: "A",
+    value: "lin_api_EvYdwyASg7HiKVbhHE4G6s0Zhm7HDxI9KWmw2zDd",
+    context: `# .env.local
+LINEAR_API_KEY=lin_api_EvYdwyASg7HiKVbhHE4G6s0Zhm7HDxI9KWmw2zDd`,
+  },
+  {
+    label: "atlassian-api-token-env",
+    kind: "atlassian-api-token",
+    tier: "A",
+    value: "ATATT3SqI4_I7JmDodj52yoLljKHDukgANoYPEyjCQwPanb-JIwIffUfXxl5SIHczMVisU0C7MkmHjIvPSujkS94BA17y6L1DKTJwywEX7_gSzjC6Tf-jgXb22lxyrvH7bEdgVcP5Y1AHn0eJCCfMuMRMkjQeuQS8eAO=zcvP4Oeuq5zLJyTO9FdeahHRC",
+    context: `# .env.production
+ATLASSIAN_EMAIL=deploy@example.com
+ATLASSIAN_API_TOKEN=ATATT3SqI4_I7JmDodj52yoLljKHDukgANoYPEyjCQwPanb-JIwIffUfXxl5SIHczMVisU0C7MkmHjIvPSujkS94BA17y6L1DKTJwywEX7_gSzjC6Tf-jgXb22lxyrvH7bEdgVcP5Y1AHn0eJCCfMuMRMkjQeuQS8eAO=zcvP4Oeuq5zLJyTO9FdeahHRC`,
+  },
+  {
+    label: "grafana-service-account-token-env",
+    kind: "grafana-token",
+    tier: "A",
+    value: "glsa_M4qCv12p7610pq5dbYsC2Olxn8tXskHp_5647a135",
+    context: `# .env.production
+GRAFANA_SERVICE_ACCOUNT_TOKEN=glsa_M4qCv12p7610pq5dbYsC2Olxn8tXskHp_5647a135`,
+  },
+  {
+    label: "grafana-cloud-api-key-env",
+    kind: "grafana-token",
+    tier: "A",
+    value: "glc_ZDQ0huZ+300Xr+higErCEfHXjH4Dhlm94GYL==",
+    context: `# .env.production
+GF_SECURITY_ADMIN_API_KEY=glc_ZDQ0huZ+300Xr+higErCEfHXjH4Dhlm94GYL==`,
+  },
+  {
+    label: "sentry-auth-token-env",
+    kind: "sentry-token",
+    tier: "A",
+    value: "sntrys_aDtLQElXGHRYxCnu_sIMXS2_EkN-JEkEw1LvVcbw1TbT",
+    context: `# .env.production
+SENTRY_AUTH_TOKEN=sntrys_aDtLQElXGHRYxCnu_sIMXS2_EkN-JEkEw1LvVcbw1TbT
+SENTRY_ORG=opencode-labs`,
+  },
+  {
+    label: "supabase-access-token-env",
+    kind: "supabase-token",
+    tier: "A",
+    value: "sbp_d80969766cbd78272c7a64b7591e4a10d6d206e3",
+    context: `# .env.local
+SUPABASE_ACCESS_TOKEN=sbp_d80969766cbd78272c7a64b7591e4a10d6d206e3
+SUPABASE_PROJECT_REF=abcdefghijklmnopqrst`,
+  },
+  {
+    label: "supabase-service-role-key-env",
+    kind: "supabase-token",
+    tier: "A",
+    value: "sb_secret_gwqF8Emw2AfL020Z2VoFHjTomGHYqVAHzq",
+    context: `# .env.production
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_gwqF8Emw2AfL020Z2VoFHjTomGHYqVAHzq`,
+  },
+  {
+    label: "newrelic-api-key-env",
+    kind: "newrelic-api-key",
+    tier: "A",
+    value: "NRAK-4IMUO1FXUML8IBDHAAOC5VH8CDD",
+    context: `# .env.production
+NEW_RELIC_USER_API_KEY=NRAK-4IMUO1FXUML8IBDHAAOC5VH8CDD
+NEW_RELIC_ACCOUNT_ID=1234567`,
+  },
+  {
+    label: "square-access-token-env",
+    kind: "square-token",
+    tier: "A",
+    value: "sq0atp-0mjwSy1XMFoZojeGNMvl4G",
+    context: `# .env.production
+SQUARE_ACCESS_TOKEN=sq0atp-0mjwSy1XMFoZojeGNMvl4G
+SQUARE_ENVIRONMENT=production`,
+  },
+  {
+    label: "square-client-secret-env",
+    kind: "square-token",
+    tier: "A",
+    value: "sq0csp-P48f_uJtTSqPkY7qzXeaSyFyg3Geoat0c8U9RVlaHLc",
+    context: `# .env.production
+SQUARE_CLIENT_SECRET=sq0csp-P48f_uJtTSqPkY7qzXeaSyFyg3Geoat0c8U9RVlaHLc`,
+  },
+  {
+    label: "age-secret-key-file",
+    kind: "age-secret-key",
+    tier: "A",
+    value: "AGE-SECRET-KEY-1L2MXK6D066X08N53TW0LYU5U32ZQ4JV3D0PEUGG858C8MPTY9W8S7R2Y0U",
+    context: `# keys/backup.agekey
+# created 2026-03-14, rotate quarterly
+AGE-SECRET-KEY-1L2MXK6D066X08N53TW0LYU5U32ZQ4JV3D0PEUGG858C8MPTY9W8S7R2Y0U`,
+  },
+  {
+    label: "firebase-fcm-server-key-json",
+    kind: "firebase-fcm-server-key",
+    tier: "A",
+    value: "AAAA2Cr8Ym3:APA91bXecz7lc1lEKy6JSz6j5W_ekiFjvvB7nlV0ASbW9AeCGED-HPKwVz_xfWaN9opmsnH9EghAtS19PgQrQ5DTMqZJNyXraG_JPW2_m7cyivxchA4Iyg65b9ioq3",
+    context: `{
+  "project_info": { "project_id": "redactor-labs" },
+  "client": [
+    {
+      "client_info": { "mobilesdk_app_id": "1:1234567890:android:abcdef0123456789" },
+      "api_key": [{ "current_key": "AAAA2Cr8Ym3:APA91bXecz7lc1lEKy6JSz6j5W_ekiFjvvB7nlV0ASbW9AeCGED-HPKwVz_xfWaN9opmsnH9EghAtS19PgQrQ5DTMqZJNyXraG_JPW2_m7cyivxchA4Iyg65b9ioq3" }]
+    }
+  ]
+}`,
+  },
+  {
+    // A base64 PKCS#8 key body without BEGIN/END framing. The certificate deny
+    // entry would swallow it if it matched every MII-prefixed run, so this is
+    // the fixture that pins the private-key carve-out in that entry.
+    label: "pkcs8-private-key-unfenced",
+    kind: "generic-secret",
+    tier: "B",
+    value: "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC78Drfd7b1HGAb9aaXbLe5+CZg8VdHYq2kmnCypKQo",
+    context: `# .env.local
+private_key = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC78Drfd7b1HGAb9aaXbLe5+CZg8VdHYq2kmnCypKQo"`,
+  },
 ]
 
 export const BENIGN: readonly BenignFixture[] = [
@@ -613,5 +956,23 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDfw8LCj3sKDoj+vWYX+gueB7Z0pEtSmlKqUZgBMWII
     text: `GOOGLE_APPLICATION_CREDENTIALS=/home/dev/.config/gcloud/application_default_credentials.json
 SSL_KEY_FILE=/etc/ssl/private/server.key
 PWD=/home/dev/projects/payments-service`,
+  },
+  {
+    label: "credential-prefixes-in-prose",
+    reason:
+      "A sentence that names provider token prefixes without reproducing a token. hf_, gsk_, dapi, xoxb- and sk-or-v1- are only anchors; without the fixed-length body each one requires there is nothing to redact.",
+    text: "Provider tokens all carry a prefix: hf_ for Hugging Face, gsk_ for Groq, dapi for Databricks, xoxb- for Slack bots and sk-or-v1- for OpenRouter. Naming the prefix in the docs is not a leak.",
+  },
+  {
+    label: "azure-parameter-names-in-prose",
+    reason:
+      "Azure's AccountKey= and sig= markers named without their values. The assignment operator is not a credential on its own; the storage key and the shared-access signature are the fixed-length payloads that follow each marker.",
+    text: "Azure puts the storage key after AccountKey= in the connection string and the shared-access signature after sig= in the query string. Neither marker is a credential by itself.",
+  },
+  {
+    label: "webhook-endpoint-hosts-without-token",
+    reason:
+      "Slack and Discord webhook host paths quoted in documentation with no token segment. The host path is public; only the trailing secret in a complete webhook URL authenticates a post.",
+    text: "The integration guide points at https://hooks.slack.com/services/ and https://discord.com/api/webhooks/ as the endpoints to configure; paste the generated URL from each service's settings page.",
   },
 ]

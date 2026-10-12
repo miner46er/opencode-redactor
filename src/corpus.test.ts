@@ -53,8 +53,8 @@ function expectNoFindings(fixture: BenignFixture, surface: TestSurface): void {
 
 describe("corpus integrity", () => {
   it("keeps the exact fixture counts", () => {
-    expect(SECRETS, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(32)
-    expect(BENIGN, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(30)
+    expect(SECRETS, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(70)
+    expect(BENIGN, "an accidental deletion or addition must be reviewed, never silently absorbed").toHaveLength(33)
   })
 
   it("embeds every secret value verbatim in its context", () => {
@@ -104,6 +104,23 @@ for (const [kind, fixtures] of byKind(TIER_A)) {
     }
   })
 }
+
+// A lookahead over a narrower charset than the run around it lets a longer
+// alphanumeric run match on its prefix and leave the tail in the output. The
+// PEM block is exempt: its END marker, not a charset, is what terminates it.
+describe("tier A / no prefix match on an over-long run", () => {
+  for (const fixture of TIER_A.filter((candidate) => candidate.kind !== "pem-private-key")) {
+    it(`${fixture.label} is rejected or covered whole when an alphanumeric tail follows`, () => {
+      for (const tail of ["9", "Z", "z"]) {
+        const text = `${fixture.value}${tail}`
+        const partial = detect(text, "prose").find(
+          (finding) => finding.kind === fixture.kind && finding.start === 0 && finding.end < text.length,
+        )
+        expect(partial, `${fixture.kind} matched a prefix and left "${tail}" behind`).toBeUndefined()
+      }
+    })
+  }
+})
 
 for (const [kind, fixtures] of byKind(TIER_B)) {
   describe(`tier B / ${kind}`, () => {
