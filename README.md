@@ -94,11 +94,15 @@ model composed.
 ```
 
 `channel` is `prompt`, `system`, `tool-output` or `tool-input`. `action` is
-`redacted` when the text was changed, `warned` when a Tier B hit in source was
-deliberately left alone, and `observed` when the text was scanned but not
-modified.
+`redacted` when the finding's span was replaced, `warned` when a Tier B hit in
+source was deliberately left alone, and `observed` for a finding in tool input,
+which is scanned but never rewritten. Every finding gets a line; a warn-only
+hit is logged even when nothing else in the same text was rewritten.
 
-Metadata only. Values are never written. Delete it freely.
+Metadata only. Values are never written. Delete it freely. The path is built
+from `homedir()` and ignores `XDG_DATA_HOME`, and the plugin does not create
+the directory: without `~/.local/share/opencode`, the write fails and only a
+stderr line the host may hide says so.
 
 ## Known host behaviours
 

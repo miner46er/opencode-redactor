@@ -66,9 +66,11 @@ not an aspiration. Numbered for citation during review.
 
 20. Fail open but loud. A scanner error lets the turn proceed unscanned and
     writes to stderr. Only a positive detection blocks.
-21. Never persist values. Audit records carry kind, surface, offset,
-    fingerprint, and action only. Surfacing findings in the OpenCode UI is
-    deliberately deferred; the audit log is the only record for now.
+21. Never persist values. Audit records carry the channel, action, tier,
+    kind, offset, and fingerprint only. Every finding is recorded, including a
+    warn-only Tier B hit when nothing else in the same text was rewritten.
+    Surfacing findings in the OpenCode UI is deliberately deferred; the audit
+    log is the only record for now.
 
 ## Accuracy bar
 
