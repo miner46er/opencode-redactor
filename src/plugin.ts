@@ -125,10 +125,8 @@ export default Plugin.define({
         // A pasted file is code even though it arrived as chat, and the Tier B
         // gate exists to keep source readable.
         const result = redact(text, textClassOf(text), registry.for(event.sessionID))
-        if (result.text !== text) {
-          event.prompt.text = result.text
-          audit(toRecords("prompt", result))
-        }
+        if (result.text !== text) event.prompt.text = result.text
+        audit(toRecords("prompt", result))
       } catch (error) {
         process.stderr.write(`[redactor] prompt pass failed, sending unscanned: ${String(error)}\n`)
       }
@@ -151,8 +149,8 @@ export default Plugin.define({
             // from this object after the hook returns. Verified against 2.0.27:
             // a canary written here is what the model then reads back.
             ;(part as { text: string }).text = result.text
-            audit(toRecords("system", result))
           }
+          audit(toRecords("system", result))
         }
       } catch (error) {
         process.stderr.write(`[redactor] system prompt pass failed, sending unscanned: ${String(error)}\n`)
@@ -171,7 +169,7 @@ export default Plugin.define({
         walkStrings(event.result, (value) => {
           if (value.length === 0) return value
           const result = redact(value, textClassOf(value), scope)
-          if (result.text !== value) records.push(...toRecords("tool-output", result))
+          records.push(...toRecords("tool-output", result))
           return result.text
         })
         audit(records)
