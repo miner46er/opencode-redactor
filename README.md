@@ -4,15 +4,16 @@
 
 An OpenCode plugin that redacts credentials from your traffic before it reaches a model provider.
 
-User input and tool output are scanned for API keys, tokens, private keys and
-connection strings. Matches are replaced with stable typed placeholders. The
-redacted text is what gets stored in session history, so scrolling back does
-not reveal what was removed.
+User input, tool output and the system prompt are scanned for API keys,
+tokens, private keys and connection strings. Matches are replaced with stable
+typed placeholders before the text is sent, and user input and tool output are
+stored redacted, so scrolling back does not reveal what was removed.
 
 ## Install
 
-Copy `src/` into your project's `.opencode/plugins/` directory, or add this to
-`opencode.json`:
+Copy the five runtime files — `plugin.ts`, `redact.ts`, `rules.ts`,
+`session.ts`, `shape.ts` — into your project's `.opencode/plugins/` directory,
+or add this to `opencode.json`:
 
 ```json
 { "plugin": ["opencode-redactor"] }
@@ -20,6 +21,10 @@ Copy `src/` into your project's `.opencode/plugins/` directory, or add this to
 
 Requires OpenCode v2 (`@opencode/plugin` 2.0.27). v1 plugins do not run on v2
 and this does not run on v1.
+
+The host loads every file in the plugins directory as a plugin, so copy only
+those five: the `*.test.ts` files and `corpus.ts` are not plugins and only add
+load errors if they land there.
 
 ## What it does and does not protect you from
 
@@ -34,7 +39,8 @@ description breaks the contract the model relies on to call it correctly, so a
 secret pasted into an MCP server's description would still reach the provider.
 
 The **disk is not clean.** OpenCode's `shell` tool writes full raw output to
-`~/.local/share/opencode/shell/<scope>/sh_*.out` *before* any plugin hook runs.
+`~/.local/share/opencode/shell/<scope>/sh_*.out` (under `$XDG_DATA_HOME` when
+that is set) *before* any plugin hook runs.
 For truncated output, session history contains a line pointing at that raw file.
 This plugin does not rewrite those files. Doing so would mean writing to a path
 this plugin does not own, keyed off a string inside data an MCP server may
@@ -62,11 +68,14 @@ it once, and a placeholder is never itself detected as a credential.
 ## Accuracy
 
 Two tiers. **Tier A** is anchored provider formats (`AKIA...`, `ghp_...`, PEM
-blocks). These redact unconditionally. **Tier B** is entropy plus a keyword, and
-fires on unprefixed values: bare `.env` entries, quoted JSON or dict keys, and
-`Authorization: Bearer`/`Basic` credentials. Tier B redacts in prose and
-only warns in code, because source is high-entropy and a redactor that mangles a
-minified bundle gets uninstalled.
+blocks). These redact unconditionally. A PEM block cut off before its END
+marker, which is what `head` or an output limit leaves behind, still redacts
+the key material that follows and stops at the first line that is not part of
+it, so a truncation note after the key survives. **Tier B** is entropy plus a
+keyword, and fires on unprefixed values: bare `.env` entries, quoted JSON or
+dict keys, and `Authorization: Bearer`/`Basic` credentials. Tier B redacts in
+prose and only warns in code, because source is high-entropy and a redactor
+that mangles a minified bundle gets uninstalled.
 
 Documented example keys (`AKIAIOSFODNN7EXAMPLE`, `sk_test_4eC39HqLyjWDarjtT1zdp7dc`)
 are suppressed. So are UUIDs, git SHAs, hex digests, bcrypt hashes, SSH public

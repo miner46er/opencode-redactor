@@ -5,8 +5,10 @@ The domain of preventing machine credentials from reaching a language model. Thi
 ## Language
 
 **Surface**:
-A channel through which text can enter or leave the agent's context.
-_Avoid_: channel, input, source, stream
+A channel through which text can enter or leave the agent's context. The code
+type and the audit log call it a Channel: `prompt`, `system`, `tool-output`,
+`tool-input`.
+_Avoid_: input, source, stream
 
 **Finding**:
 A span of text a Detector classified as a credential, carrying a kind, a location, and a Fingerprint. A Finding is not the same as a secret. A false positive is still a Finding.
@@ -37,11 +39,11 @@ One agent turn's data as it crosses every Surface.
 _Avoid_: turn, request, message, batch
 
 **Provenance**:
-Whether a span of text was authored by a person or produced by a model. Human-authored text is rewritten; model-produced text is only observed.
+Whether a span of text is on its way to the model or was produced by it. Text given to the model is rewritten; tool input, which the model writes, is only observed, and the model's replies are never scanned.
 _Avoid_: source, origin, direction
 
 **Backstop**:
-A re-scan of text that a Canonical Point has already passed, run as a safety net when the primary layer missed or failed.
+A re-scan of text that the canonical redaction layer has already passed, run as a safety net when the primary layer missed or failed.
 _Avoid_: fallback, secondary check, defense
 
 **Clean**:
